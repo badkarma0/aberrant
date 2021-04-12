@@ -5,10 +5,11 @@ import scrapers/s_import
 import termstyle
 import times
 
-const version = "Aberrant v0.1.2"
-verbose = true
+const version = "Aberrant v0.1.3"
 
 proc main =
+  lt_do_debug = ga("debug", false)
+  lt_do_verbose = ga("verbose", false)
   let a = red version
   echo &"=== [ {a} ] ==="
   # dbg $pairs
@@ -25,6 +26,5 @@ proc main =
       let ft = cpuTime() - st
       log &"Operation took {ft} seconds"
   exit_logger()
-
 
 main()
