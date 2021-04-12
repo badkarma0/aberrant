@@ -13,7 +13,7 @@ const site = "http://cfake.com/"
 const id = "cfake"
 
 scraper id:
-  let v_name = v("arg1")
+  let v_name = ga("arg1")
   if v_name.len == 0:
     echo "error name is empty"
     return
@@ -24,10 +24,8 @@ scraper id:
     return
 
   let url = parseUrl(site) / a.attr("href")
-  let path = "./test" / v_name
 
   echo &"Found {v_name} @ {url}"
-  echo &"Downloading to: {path}"
 
   let res = fetch($url)
   let r1 = re"thumbs"

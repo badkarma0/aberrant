@@ -1,28 +1,16 @@
 import puppy
 import os
-import htmlparser
-import xmltree
-import nimquery
 # import cpuinfo
 import json
 import urlly
-import uri
-import strformat
-import termstyle
+import strformat, strutils
+import termstyle, parseopt
 import times
 import math
+import base
 
-type
-  Options* = ref object
-    overwrite: bool
-  Download* = ref object
-    url, path: string
-    opts: Options
 
-var
-  downloadChannel: Channel[Download]
-downloadChannel.open()
-
+# LOGGING
 var 
   logChannel: Channel[string]
   lt*: Thread[void]
@@ -62,42 +50,21 @@ proc err*(msg: string) =
   ln red("[ERR] ") & msg
 
 
-proc download*(dl: Download) =
-  var path = dl.url.parseUrl.path
-  if dl.path.len > 0:
-    path = dl.path
+# DOWNLOADS
+type
+  Options* = ref object
+    overwrite: bool
+  Flags* = ref object
+    skipped: bool
+    time: float
+  Download* = ref object
+    url, path: string
+    opts: Options
+    flags: Flags
 
-  if path.fileExists and not dl.opts.overwrite: 
-    return
-
-  let req = Request(
-    url: parseUrl(dl.url),
-    verb: "get"
-  )
-
-  let res = fetch(req)
-  if res.code == 200:
-    writeFile(path, res.body)
-
-proc makeDownload*(url, path: string, opts: Options): Download =
-  result = Download(
-    url: url, 
-    path: path, 
-    opts: opts
-  )
-
-proc makeDownload*(url, path = "", overwrite = false): Download =
-  result = makeDownload(
-    url, path, Options(
-      overwrite: overwrite
-    )
-  )
-
-# proc makeDownload*(url, path = ""): Download =
-  # return makeDownload(url, path, default(Options))
-
-proc download*(url, path: string, overwrite = false) =
-  download makeDownload(url, path, overwrite)
+var
+  downloadChannel: Channel[Download]
+downloadChannel.open()
 
 proc `$`*(dl: Download): string =
   let a = red "=>"
@@ -118,19 +85,73 @@ proc bytesToHR(byts: BiggestInt): string =
     i += 1
   $bytes & byteUnits[i] 
 
+const
+  s_skipped = italic("Skipped")
+  s_downloaded = bold("Downloaded")
+
+proc download_base*(dl: Download) =
+  var path = dl.url.parseUrl.path
+  if dl.path.len > 0:
+    path = dl.path
+
+  if path.fileExists and not dl.opts.overwrite:
+    dl.flags.skipped = true
+    return
+
+  let req = Request(
+    url: parseUrl(dl.url),
+    verb: "get"
+  )
+  let st = cpuTime()
+  let res = fetch(req)
+  if res.code == 200:
+    writeFile(path, res.body)
+  dl.flags.time = round(cpuTime() - st, 3)
+
+proc makeDownload*(url, path: string, opts: Options, flags: Flags): Download =
+  result = Download(
+    url: url, 
+    path: path, 
+    opts: opts,
+    flags: flags
+  )
+
+proc makeDownload*(url, path = "", overwrite = false): Download =
+  result = makeDownload(
+    url, path, Options(
+      overwrite: overwrite
+    ), Flags(
+      time: 0,
+      skipped: false
+    )
+  )
+
+# proc makeDownload*(url, path = ""): Download =
+  # return makeDownload(url, path, default(Options))
+
+proc download*(dl: Download) =
+  try:
+    dl.download_base()
+    let fs = dl.path.getFileSize.bytesToHR
+    let t = dl.flags.time
+    if dl.flags.skipped:
+      log &"{s_skipped}[{fs}]: {dl}"
+    else:  
+      log &"{s_downloaded}[{t}s][{fs}]: {dl}"
+  except Exception:
+    err "Download failed"
+
+proc download*(url, path: string, overwrite = false) =
+  download makeDownload(url, path, overwrite)
+
+
+
 proc downloadFromChannel {.thread.} =
   while true:
     let data = downloadChannel.tryRecv()
     if not data.dataAvailable: break
     let dl = data.msg
-    try:
-      let st = cpuTime()
-      dl.download()
-      let ft = round(cpuTime() - st, 3)
-      let fs = dl.path.getFileSize.bytesToHR
-      log &"Downloaded[{ft}s][{fs}]: {dl}"
-    except Exception:
-      err "Download failed"
+    dl.download()
 
 proc download*(urls: openArray[string], path: string) =
   if urls.len <= 0:
@@ -148,19 +169,42 @@ proc download*(urls: openArray[string], path: string) =
     createThread(threads[i], downloadFromChannel)
   joinThreads(threads)
 
-proc `$`*(node: XmlNode, q: string): XmlNode =
-  result = node.querySelector(q)
+# ARGS
+var args: seq[KVPair] = @[]
 
-proc `$$`*(node: XmlNode, q: string): seq[XmlNode] =
-  result = node.querySelectorAll(q)
+template loa(name: string, def: typed, body: untyped) =
+  for ar {.inject.} in args:
+    if ar.key == name:
+      try:
+        block:
+          body
+      except Exception:
+        err &"{name} has wrong type"
+  return def
 
-proc fetchHtml*(url: urlly.Url): XmlNode =
-  let res = fetch($url)
-  parseHtml(res)
+proc ga*(name: string, def = ""): string =
+  loa name, def:
+    return ar.value
+proc ga*(name: string, def: bool): bool =
+  loa name, def:
+    return ar.value.parseBool
+proc ga*(name: string, def: int): int =
+  loa name, def:
+    return ar.value.parseInt
+proc ga*(name: string, def: float): float =
+  loa name, def:
+    return ar.value.parseFloat
 
-proc fetchJson*(url: urlly.Url): JsonNode =
-  let res = fetch($url)
-  parseJson(res)
+proc parse() =
+  var ac = 0
+  for kind, key, val in getopt():
+    case kind:
+    of cmdArgument:
+      args.add (key: &"arg{ac}", value: key)
+      ac += 1
+    of cmdLongOption, cmdShortOption:
+      args.add (key: key, value: val)
+    of cmdEnd:
+      break
 
-proc `/`*(url: urlly.Url, ext: string): urlly.Url =
-  parseUrl($(parseUri($url) / ext))
+parse()

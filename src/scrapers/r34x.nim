@@ -9,9 +9,9 @@ import strutils
 
 const api = "https://rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&limit=100"
 scraper "r34x":
-  let v_tags = v("arg1").replace(" ", "+")
-  let v_max = v("max", "0").parseInt
-  let v_full = v("full", "false").parseBool
+  let v_tags = ga("arg1").replace(" ", "+")
+  let v_max = ga("max", 100)
+  let v_full = ga("full", false)
   if v_tags == "":
     err "please specify some tags"
     return
@@ -32,5 +32,5 @@ scraper "r34x":
       pc += 1
       for elem in data.getElems():
         urls.add(elem[if v_full: "file_url" else: "sample_url"].getStr())
-      # echo urls
+      # dbg $urls
     # echo fc, pc, tc

@@ -1,8 +1,6 @@
-import termstyle
-
 type
   KVPair* = tuple[key, value: string]
-  ScraperRun* = proc (args: varargs[KVPair])
+  ScraperRun* = proc ()
   Scraper* = ref object
     name*: string
     srun*: ScraperRun
