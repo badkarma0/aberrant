@@ -33,6 +33,9 @@ proc has*(fs: JsonFS, path: string): bool =
 proc newJFS*: JsonFS =
   return newJObject()
 
+proc write*(fs: JsonFS, path: string) =
+  writeFile(path, $fs)
+
 when isMainModule:
   var testFs: JsonFS = newJObject()
   testFs.create "some/path/that/is.txt"

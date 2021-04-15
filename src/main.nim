@@ -5,7 +5,7 @@ import scrapers/s_import
 import termstyle
 import times
 
-const version = "Aberrant v0.1.3"
+const version = "Aberrant v0.1.4"
 
 proc main =
   lt_do_debug = ga("debug", false)

@@ -8,11 +8,15 @@ import nimquery
 import puppy
 import json
 import urlly
+import sequtils
 
-const root = "./aberrant/downloads/"
+const root = "./aberrant/"
 
 proc getRoot*: string =
   return root
+
+proc getDlRoot*: string =
+  return getRoot() / "downloads"
 
 proc `$`*(node: XmlNode, q: string): XmlNode =
   result = node.querySelector(q)
@@ -41,7 +45,7 @@ template page*(spath: string, body: untyped) =
   var urls {.inject.}: seq[string]
   block:
     body
-  urls.download root / sid / spath
+  urls.download getDlRoot() / sid / spath
 
 
 template hpage*(url: Url, spath: string, body: untyped) =
@@ -63,5 +67,12 @@ template pages*(r1, r2: int, body: untyped) =
       body
 
 import uri
+proc `/`*(urls: varargs[urlly.Url]): urlly.Url =
+  var base = parseUri("")
+  for url in urls:
+    base = base.combine(parseUri($url))
+  parseUrl($base)
+
 proc `/`*(url: urlly.Url, ext: string): urlly.Url =
-  parseUrl($(parseUri($url) / ext))
+  url / parseUrl(ext)
+
