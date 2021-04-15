@@ -1,9 +1,12 @@
+import nre, urlly, options
+
 type
   KVPair* = tuple[key, value: string]
-  ScraperRun* = proc ()
+  ScraperRun* = proc (url: Url)
   Scraper* = ref object
     name*: string
     srun*: ScraperRun
+    rex*: Regex
   Scrapers* = seq[Scraper]
 
 var scrapers*: Scrapers = @[]

@@ -101,6 +101,7 @@ proc bytesToHR(byts: BiggestInt): string =
 const
  s_skipped = italic("Skipped")
  s_downloaded = bold("Downloaded")
+ s_failed = "Failed".style(termRed & termNegative)
 
 proc download_base(dl: Download) =
  var path = dl.url.parseUrl.path
@@ -152,7 +153,7 @@ proc download*(dl: Download) =
   else:
    log &"{s_downloaded}[{t}s][{fs}]: {dl}"
  except Exception:
-  err "Download failed"
+  err &"{s_failed}: {dl}"
 
 proc download*(url, path: string, overwrite = false) =
  download makeDownload(url, path, overwrite)
@@ -230,3 +231,6 @@ proc ga*(name: string, def: float): float =
 proc `/=`*(p1: var string, p2: string) =
   # append something to a path, short for "p1 = p1 / p2"
   p1 = p1 / p2
+
+proc empty*(url: Url): bool =
+  $url == ""

@@ -1,4 +1,4 @@
-import re
+import nre
 import strutils
 import math
 import puppy
@@ -11,36 +11,53 @@ import ../screep/scraper
 
 const site = "http://cfake.com/"
 const id = "cfake"
+let rex = re(site & "picture") 
 
-scraper id:
-  let v_name = ga("arg1")
-  if v_name.len == 0:
-    echo "error name is empty"
-    return
-  let doc = fetchHtml(parseUrl(site & "picture?libelle=" & v_name))
-  let a = doc $ ".name_vignette a"
-  if a.innerText != v_name:
-    echo &"inccorect name {v_name}, closest is {a.innerText}"
-    return
+let 
+  r1 = re"thumbs"
+  r2 = re"about.([0-9]*).for"
+  r3 = re"picture/(.*?)/"
 
-  let url = parseUrl(site) / a.attr("href")
+scraper id, rex:
+  var target: Url
 
-  echo &"Found {v_name} @ {url}"
+  var v_name = ga("arg1")
+  if v_name == "":
+    if not xurl.empty:
+      let match = ($xurl).find r3
+      target = xurl
+      v_name = match.get.captures.toSeq[0].get
+    else:
+      err "name can not be empty"
+      return
+  if target.empty:  
+    let doc = fetchHtml(parseUrl(site & "picture?libelle=" & v_name))
+    let a = doc $ ".name_vignette a"
+    if a.innerText != v_name:
+      err &"inccorect name {v_name}, closest is {a.innerText}"
+      return
 
-  let res = fetch($url)
-  let r1 = re"thumbs"
-  let r2 = re"about.([0-9]*).for"
-  var matches = [""]
-  discard res.find(r2, matches)
+    target = parseUrl(site) / a.attr("href")
 
-  let total = matches[0].parseInt
+  log &"Found {v_name} @ {target}"
+
+  let res = fetch($target)
+
+  let match = res.find(r2)
+
+  var total = 0
+  if match.isSome:
+    total = match.get.captures.toSeq[0].get.parseInt
+  if total == 0:
+    err &"found no images"
+    return    
   let pageCount = ceil(total / 30).toInt
 
-  echo &"Images: {total}"
-  echo &"Pages: {pageCount}"
+  log &"Images: {total}"
+  log &"Pages: {pageCount}"
 
   pages(0, pageCount):
-    hpage(url / &"p{i * 30}", v_name):
+    hpage(target / &"p{i * 30}", v_name):
       for el in data $$ ".thumb_show ~ a img":
         let img = site & el.attr("src").replace(r1,"photos")
         urls.add(img)

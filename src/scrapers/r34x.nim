@@ -8,7 +8,7 @@ import strformat
 import strutils
 
 const api = "https://rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&limit=100"
-scraper "r34x":
+scraper "r34x", default_rex:
   let v_tags = ga("arg1").replace(" ", "+")
   let v_max = ga("max", 100)
   let v_full = ga("full", false)

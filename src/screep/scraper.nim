@@ -8,9 +8,13 @@ import nimquery
 import puppy
 import json
 import urlly
-import sequtils
+import nre, options, termstyle, strformat
 
-const root = "./aberrant/"
+const 
+  root = "./aberrant/"
+  s_crawling* = "Crawling".negative
+
+let default_rex* = re""
 
 proc getRoot*: string =
   return root
@@ -32,10 +36,12 @@ proc fetchJson*(url: Url): JsonNode =
   let res = fetch($url)
   parseJson(res)
 
-template scraper*(id: string, body: untyped) =
+
+template scraper*(id: string, prex: Regex, body: untyped): untyped =
   scrapers.add Scraper(
     name: id, 
-    srun: proc () =
+    rex: prex,
+    srun: proc (xurl {.inject.}: Url) =
       let sid {.inject.} = id
       block:
         body
@@ -62,7 +68,7 @@ template jpage*(url: Url, spath: string, body: untyped) =
     
 template pages*(r1, r2: int, body: untyped) =
   for i {.inject.} in r1..r2:
-    echo "scraping page " & $i
+    log &"{s_crawling} page " & $i
     block:
       body
 

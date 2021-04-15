@@ -152,11 +152,14 @@ proc crawl_worker {.thread.} =
         path.parentDir.createDir
         dl.download
 
-scraper "mcrawl":
-  let v_start_url = ga("arg1")
+scraper "mcrawl", default_rex:
+  var v_start_url = ga("arg1")
   if v_start_url == "":
-    err "please provide an url"
-    return
+    if not xurl.empty:
+      v_start_url = $xurl
+    else: 
+      err "please provide an url"
+      return
   
   crawl_channel.send parseUrl(v_start_url).makeTarget
 
