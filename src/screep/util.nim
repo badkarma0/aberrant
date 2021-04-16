@@ -10,27 +10,24 @@ import math
 import base
 
 
-
-
-
 # LOGGING
 var
- logChannel: Channel[string]
- lt*: Thread[void]
- lt_do_blocking* = true
- lt_do_debug* = false
- lt_do_verbose* = false
- lt_show_thread* = true
- lt_exit = false
+  logChannel: Channel[string]
+  lt*: Thread[void]
+  lt_do_blocking* = true
+  lt_do_debug* = false
+  lt_do_verbose* = false
+  lt_show_thread* = true
+  lt_exit = false
 
 proc logger() =
- while true:
-  let tried = logChannel.tryRecv()
-  if not tried.dataAvailable:
-    if lt_exit:
-      break
-    continue
-  echo tried.msg
+  while true:
+    let tried = logChannel.tryRecv()
+    if not tried.dataAvailable:
+      if lt_exit:
+        break
+      continue
+    echo tried.msg
 
 logChannel.open()
 createThread(lt, logger)
@@ -63,6 +60,125 @@ proc dbg*(msg: string) =
   if lt_do_debug:
     ln yellow("[DBG] ") & msg
 
+# MISC
+
+proc `/=`*(p1: var string, p2: string) =
+  # append something to a path, short for "p1 = p1 / p2"
+  p1 = p1 / p2
+
+proc empty*(url: Url): bool =
+  $url == ""
+
+proc row(s: string, ch = '+', color = termWhite): string =
+  for c in 0..s.len + 1:
+    result.add(ch)
+  result.style(color)
+
+proc col(s: string, ch = '+', cc = termWhite, sc = termWhite): string =
+  result.add(cc)
+  result.add("\n" & ch)
+  result.add(termClear & sc)
+  result.add(s)
+  result.add(termClear & cc)
+  result.add(ch)
+  result.add(termClear)
+
+proc box(s: string, ch = '+', cc = termWhite, sc = termWhite): string =
+  result.add s.row(ch, cc)
+  for spart in s.split("\n"):
+    result.add spart.col(ch, cc, sc)
+  result.add('\n')
+  result.add s.row(ch, cc)
+
+    
+# ARGS
+
+type
+  Arg* = ref object
+    name*: string
+    help*: string
+    kind*: string
+    req*: bool
+    smod*: string
+  Args = seq[Arg]
+
+var r_args: Args
+
+proc parse(): seq[KVPair] =
+  var args: seq[KVPair] = @[]
+  var ac = 0
+  for kind, key, val in getopt():
+    case kind:
+    of cmdArgument:
+      args.add (key: &"arg{ac}", value: key)
+      ac += 1
+    of cmdLongOption, cmdShortOption:
+      if val == "":
+        args.add (key: key, value: "true")
+      else:
+        args.add (key: key, value: val)
+    of cmdEnd:
+      break
+  args
+
+template loa(name: string, def: typed, body: untyped) =
+  for ar {.inject.} in parse():
+    if ar.key == name:
+      try:
+        block:
+          body
+        break
+      except Exception:
+        err &"{name} has wrong type"
+  return def
+
+proc ga*(name: string, def = ""): string =
+  loa name, def:
+    return ar.value
+proc ga*(name: string, def: bool): bool =
+  loa name, def:
+    return ar.value.parseBool
+proc ga*(name: string, def: int): int =
+  loa name, def:
+    return ar.value.parseInt
+proc ga*(name: string, def: float): float =
+  loa name, def:
+    return ar.value.parseFloat
+
+template ra*(xname: string, def: typed = "", xhelp = "", xreq = false, xmod = "") =
+  r_args.add Arg(name: xname, help: xhelp, kind: $typeof(def), req: xreq, smod: xmod)
+
+template arg*(arg_name: untyped, name: string, def: typed = "", help = "", req = false, smod = "") =
+  ra name, def, help, req, smod
+  var `arg_name` {.inject.} = ga(name, def)
+
+proc print(arg: Arg) =
+  var rs = ""
+  if arg.req:
+    rs = "*"
+  echo &"{arg.name}\t\t{rs}\t {arg.kind}\t\t{arg.help}"
+
+proc print_mod(s: string) =
+  echo bold negative &"\n {s}"
+
+proc print_help*(desc: string) =
+  # echo box(&" {desc} ", '0', cc = termCyan & termNegative, sc = termNegative)
+  echo ""
+  for line in desc.split('\n'):
+    echo &" {line}"
+  echo ""
+  echo red bold &"name\t\trequired  type\t\t help"
+  "global".print_mod
+  for arg in r_args:
+    if arg.smod == "":
+      arg.print
+  for scraper in scrapers:
+    scraper.name.print_mod
+    for arg in r_args:
+      if arg.smod == scraper.name:
+        arg.print
+
+
 # DOWNLOADS
 type
  Options* = ref object
@@ -74,6 +190,8 @@ type
   url, path: string
   opts: Options
   flags: Flags
+
+arg v_dry, "dry", false, help = "no downloading"
 
 var
  downloadChannel: Channel[Download]
@@ -99,52 +217,57 @@ proc bytesToHR(byts: BiggestInt): string =
  $bytes & byteUnits[i]
 
 const
- s_skipped = italic("Skipped")
- s_downloaded = bold("Downloaded")
- s_failed = "Failed".style(termRed & termNegative)
+  s_skipped = italic("Skipped")
+  s_downloaded = bold("Downloaded")
+  s_failed = "Failed".style(termRed & termNegative)
 
 proc download_base(dl: Download) =
- var path = dl.url.parseUrl.path
- if dl.path.len > 0:
-  path = dl.path
+  var path = dl.url.parseUrl.path
+  if dl.path.len > 0:
+    path = dl.path
 
- if path.fileExists and not dl.opts.overwrite:
-  dl.flags.skipped = true
-  return
+  path.parentDir.createDir
 
- let req = Request(
-   url: parseUrl(dl.url),
-   verb: "get"
- )
- let st = cpuTime()
- let res = fetch(req)
- if res.code == 200:
-  writeFile(path, res.body)
- dl.flags.time = round(cpuTime() - st, 3)
+  if path.fileExists and not dl.opts.overwrite:
+    dl.flags.skipped = true
+    return
+
+  let req = Request(
+    url: parseUrl(dl.url),
+    verb: "get"
+  )
+  let st = cpuTime()
+  let res = fetch(req)
+  if res.code == 200:
+    writeFile(path, res.body)
+  dl.flags.time = round(cpuTime() - st, 3)
 
 proc makeDownload*(url, path: string, opts: Options, flags: Flags): Download =
- result = Download(
-   url: url,
-   path: path,
-   opts: opts,
-   flags: flags
- )
+  result = Download(
+    url: url,
+    path: path,
+    opts: opts,
+    flags: flags
+  )
 
 proc makeDownload*(url, path = "", overwrite = false): Download =
- result = makeDownload(
-   url, path, Options(
-     overwrite: overwrite
-  ), Flags(
-    time: 0,
-    skipped: false
+  result = makeDownload(
+    url, path, Options(
+      overwrite: overwrite
+    ), Flags(
+      time: 0,
+      skipped: false
+    )
   )
- )
 
 # proc makeDownload*(url, path = ""): Download =
  # return makeDownload(url, path, default(Options))
 
 proc download*(dl: Download) =
  try:
+  if v_dry:
+    log &"Dry Find {dl}"
+    return
   dl.download_base()
   let fs = dl.path.getFileSize.bytesToHR
   let t = dl.flags.time
@@ -184,53 +307,3 @@ proc download*(urls: openArray[string], path: string) =
  joinThreads(threads)
 
 
-# ARGS
-
-proc parse(): seq[KVPair] =
-  var args: seq[KVPair] = @[]
-  var ac = 0
-  for kind, key, val in getopt():
-    case kind:
-    of cmdArgument:
-      args.add (key: &"arg{ac}", value: key)
-      ac += 1
-    of cmdLongOption, cmdShortOption:
-      if val == "":
-        args.add (key: key, value: "true")
-      else:
-        args.add (key: key, value: val)
-    of cmdEnd:
-      break
-  args
-
-template loa(name: string, def: typed, body: untyped) =
-  for ar {.inject.} in parse():
-    if ar.key == name:
-      try:
-        block:
-          body
-      except Exception:
-        err &"{name} has wrong type"
-  return def
-
-proc ga*(name: string, def = ""): string =
-  loa name, def:
-    return ar.value
-proc ga*(name: string, def: bool): bool =
-  loa name, def:
-    return ar.value.parseBool
-proc ga*(name: string, def: int): int =
-  loa name, def:
-    return ar.value.parseInt
-proc ga*(name: string, def: float): float =
-  loa name, def:
-    return ar.value.parseFloat
-
-# MISC
-
-proc `/=`*(p1: var string, p2: string) =
-  # append something to a path, short for "p1 = p1 / p2"
-  p1 = p1 / p2
-
-proc empty*(url: Url): bool =
-  $url == ""

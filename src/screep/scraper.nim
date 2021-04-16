@@ -37,40 +37,50 @@ proc fetchJson*(url: Url): JsonNode =
   parseJson(res)
 
 
-template scraper*(id: string, prex: Regex, body: untyped): untyped =
-  scrapers.add Scraper(
-    name: id, 
-    rex: prex,
-    srun: proc (xurl {.inject.}: Url) =
-      let sid {.inject.} = id
+template scraper*(id: string, body: untyped) =
+  var rex {.inject.} = default_rex
+  template match(xrex: Regex) =
+    rex = xrex
+  template ra(name: string, def: typed = "", help = "", req = false, smod = id) =
+    ra name, def, help, req, smod
+  template arg(arg_name: untyped, name: string, def: typed = "", help = "", req = false, smod = id) =
+    ra name, def, help, req, smod
+    var `arg_name` {.inject.} = ga(name, def)
+  template exec(exec_body: untyped) =
+    template pages(r1, r2: int, pages_body: untyped) =
+      for i {.inject.} in r1..r2:
+        log &"{s_crawling} page " & $i
+        block:
+          pages_body
+    
+    template page(spath: string, page_body: untyped) =
+      var urls {.inject.}: seq[string]
       block:
-        body
-  )
+        page_body
+      urls.download getDlRoot() / id / spath
 
-template page*(spath: string, body: untyped) =
-  var urls {.inject.}: seq[string]
+    template hpage(url: Url, spath: string, hpage_body: untyped) =
+      page spath:
+        let data {.inject.} = fetchHtml(url)
+        block:
+          hpage_body
+
+    template jpage(url: Url, spath: string, jpage_body: untyped) =
+      page spath:
+        let data {.inject.} = fetchJson(url)
+        block:
+          jpage_body
+    scrapers.add Scraper(
+      name: id, 
+      rex: rex,
+      srun: proc (xurl {.inject.}: Url) =
+        block:
+          exec_body
+    )
   block:
     body
-  urls.download getDlRoot() / sid / spath
-
-
-template hpage*(url: Url, spath: string, body: untyped) =
-  page spath:
-    let data {.inject.} = fetchHtml(url)
-    block:
-      body
-
-template jpage*(url: Url, spath: string, body: untyped) =
-  page spath:
-    let data {.inject.} = fetchJson(url)
-    block:
-      body
     
-template pages*(r1, r2: int, body: untyped) =
-  for i {.inject.} in r1..r2:
-    log &"{s_crawling} page " & $i
-    block:
-      body
+
 
 import uri
 proc `/`*(urls: varargs[urlly.Url]): urlly.Url =

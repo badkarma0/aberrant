@@ -77,13 +77,12 @@ proc check_if_path_exists(path: string): bool =
 
 proc crawl_worker {.thread.} =
   let
-    v_dry = ga("d", false)
-    v_brief = ga("brief", false)
-    v_level = ga("level", 2)
-    v_map = ga("map", false)
-    v_path_style = ga("pstyle")
-    v_crawl_regex = ga("cregex").re
-    v_downl_regex = ga("dregex").re
+    v_brief = "brief".ga false 
+    v_level = "level".ga 2 
+    v_map = "map".ga false 
+    v_path_style = "pstyle".ga 
+    v_crawl_regex = "cregex".ga.re  
+    v_downl_regex = "dregex".ga.re 
 
   while true:
     let item = crawl_channel.tryRecv()
@@ -146,38 +145,41 @@ proc crawl_worker {.thread.} =
 
 
       let dl = makeDownload($downl_url, path)
-      if v_dry:
-        log &"Found {dl}"
-      else:
-        path.parentDir.createDir
-        dl.download
+      dl.download
 
-scraper "mcrawl", default_rex:
-  var v_start_url = ga("arg1")
-  if v_start_url == "":
-    if not xurl.empty:
-      v_start_url = $xurl
-    else: 
-      err "please provide an url"
-      return
-  
-  crawl_channel.send parseUrl(v_start_url).makeTarget
+scraper "mcrawl":
+  ra "brief", false
+  ra "level", 2
+  ra "pstyle"
+  ra "dregex"
+  ra "cregex"
+  arg v_map, "map", false
+  arg v_start_url, "arg1"
+  exec:
+    if v_start_url == "":
+      if not xurl.empty:
+        v_start_url = $xurl
+      else: 
+        err "please provide an url"
+        return
+    
+    crawl_channel.send parseUrl(v_start_url).makeTarget
 
-  var jfs_thread: Thread[void]
-  jfs_thread.createThread jfs_worker
+    var jfs_thread: Thread[void]
+    jfs_thread.createThread jfs_worker
 
-  const v_threads = 10
-  var threads: array[v_threads, Thread[void]]
-  for i in 0..v_threads-1:
-    threads[i].createThread crawl_worker
-  
-  joinThreads(threads)
+    const v_threads = 10
+    var threads: array[v_threads, Thread[void]]
+    for i in 0..v_threads-1:
+      threads[i].createThread crawl_worker
+    
+    joinThreads(threads)
 
-  if ga("map", false):
-    let map_path = getRoot() / "mcrawl_maps" / parseUrl(v_start_url).hostname & ".json"
-    map_path.parentDir.createDir
-    jfs_in_channel.send(JFSRequest(id: getThreadId(), path: "write:" & map_path))
+    if v_map:
+      let map_path = getRoot() / "mcrawl_maps" / parseUrl(v_start_url).hostname & ".json"
+      map_path.parentDir.createDir
+      jfs_in_channel.send(JFSRequest(id: getThreadId(), path: "write:" & map_path))
 
-  exit_jfs_worker = true
+    exit_jfs_worker = true
 
-  joinThread(jfs_thread)
+    joinThread(jfs_thread)
