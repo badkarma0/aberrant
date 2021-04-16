@@ -5,7 +5,7 @@ import scrapers/s_import
 import termstyle
 import times, options, urlly, nre
 
-const version = "Aberrant v0.1.6"
+const version = "Aberrant v0.1.7"
 
 proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
   for scraper in scrapers:
@@ -25,10 +25,10 @@ proc run(scraper: Scraper, url = "") =
   log &"Operation took {ft} seconds"
 
 proc main =
-  ra "debug", false, xhelp = "debug logging"
-  ra "verbose", false, xhelp = "verbose logging"
+  ra "debug", false, help = "debug logging"
+  ra "verbose", false, help = "verbose logging"
   arg v_help, "help", false, help = "show this menu"
-  
+  arg v_arg0, "arg0", help = &"scraper name or url\n scraper can be one of {scrapers}", req = true
   lt_do_debug = ga("debug", false)
   lt_do_verbose = ga("verbose", false)
 
@@ -36,10 +36,14 @@ proc main =
   echo &"=== [ {a} ] ==="
 
   if v_help:
-    print_help("some web scrapers\nsome new line")
+    print_help("some web scrapers\nur mom")
     exit_logger()
     return
 
+  if arg_starup_check():
+    exit_logger()
+    return
+  
   # dbg $pairs
   let target = ga("arg0")
   if target == "":

@@ -19,7 +19,7 @@ let
 
 scraper "cfake":
   match re(site & "picture")
-  arg v_name, "arg1", help="name of person"
+  arg v_name, "arg1", help="name of person", req = true
   exec:
     var target = parseUrl("")
     if v_name == "":

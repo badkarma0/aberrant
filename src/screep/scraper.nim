@@ -14,7 +14,11 @@ const
   root = "./aberrant/"
   s_crawling* = "Crawling".negative
 
-let default_rex* = re""
+let 
+  default_rex = re""
+
+# arg v_path, "out", root, help = &"output root directory, default: {root}"
+
 
 proc getRoot*: string =
   return root

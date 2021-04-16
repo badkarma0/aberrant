@@ -7,7 +7,7 @@ import strformat, strutils
 import termstyle, parseopt
 import times
 import math
-import base
+import base, sequtils, sugar, algorithm
 
 
 # LOGGING
@@ -104,54 +104,6 @@ type
 
 var r_args: Args
 
-proc parse(): seq[KVPair] =
-  var args: seq[KVPair] = @[]
-  var ac = 0
-  for kind, key, val in getopt():
-    case kind:
-    of cmdArgument:
-      args.add (key: &"arg{ac}", value: key)
-      ac += 1
-    of cmdLongOption, cmdShortOption:
-      if val == "":
-        args.add (key: key, value: "true")
-      else:
-        args.add (key: key, value: val)
-    of cmdEnd:
-      break
-  args
-
-template loa(name: string, def: typed, body: untyped) =
-  for ar {.inject.} in parse():
-    if ar.key == name:
-      try:
-        block:
-          body
-        break
-      except Exception:
-        err &"{name} has wrong type"
-  return def
-
-proc ga*(name: string, def = ""): string =
-  loa name, def:
-    return ar.value
-proc ga*(name: string, def: bool): bool =
-  loa name, def:
-    return ar.value.parseBool
-proc ga*(name: string, def: int): int =
-  loa name, def:
-    return ar.value.parseInt
-proc ga*(name: string, def: float): float =
-  loa name, def:
-    return ar.value.parseFloat
-
-template ra*(xname: string, def: typed = "", xhelp = "", xreq = false, xmod = "") =
-  r_args.add Arg(name: xname, help: xhelp, kind: $typeof(def), req: xreq, smod: xmod)
-
-template arg*(arg_name: untyped, name: string, def: typed = "", help = "", req = false, smod = "") =
-  ra name, def, help, req, smod
-  var `arg_name` {.inject.} = ga(name, def)
-
 proc print(arg: Arg) =
   var rs = ""
   if arg.req:
@@ -177,6 +129,74 @@ proc print_help*(desc: string) =
     for arg in r_args:
       if arg.smod == scraper.name:
         arg.print
+
+proc parse(): seq[KVPair] =
+  var args: seq[KVPair] = @[]
+  var ac = 0
+  for kind, key, val in getopt():
+    case kind:
+    of cmdArgument:
+      args.add KVPair(key: &"arg{ac}", value: key)
+      ac += 1
+    of cmdLongOption, cmdShortOption:
+      if val == "":
+        args.add KVPair(key: key, value: "true")
+      else:
+        args.add KVPair(key: key, value: val)
+    of cmdEnd:
+      break
+  args
+
+
+proc arg_starup_check*: bool =
+  let parsed = parse()
+  r_args.sort do (a,b: Arg) -> int:
+    a.name.cmp b.name
+  for arg in r_args:
+    let name = arg.name
+    if parsed.any((a) => a.key == name):
+      continue
+    if arg.req:
+      echo &"Error Missing arg: {arg.name}, here is the relevant help"
+      arg.smod.print_mod
+      arg.print
+      return true
+  return false
+
+template loa(name: string, def: typed, body: untyped) =
+  for ar {.inject.} in parse():
+    if ar.key == name:
+      try:
+        block:
+          body
+        break
+      except Exception:
+        err &"{name} has wrong type"
+
+  return def
+
+proc ga*(name: string, def = ""): string =
+  loa name, def:
+    return ar.value
+proc ga*(name: string, def: bool): bool =
+  loa name, def:
+    return ar.value.parseBool
+proc ga*(name: string, def: int): int =
+  loa name, def:
+    return ar.value.parseInt
+proc ga*(name: string, def: float): float =
+  loa name, def:
+    return ar.value.parseFloat
+
+proc add_arg(name, kind, help, smod: string, req: bool) =
+  r_args.add Arg(name: name, help: help, kind: kind, req: req, smod: smod)
+
+template ra*(name: string, def: typed = "", help = "", req = false, smod = "") =
+  add_arg name, $typeof(def), help, smod, req
+
+template arg*(arg_name: untyped, name: string, def: typed = "", help = "", req = false, smod = "") =
+  ra name, def, help, req, smod
+  var `arg_name` {.inject.} = ga(name, def)
 
 
 # DOWNLOADS

@@ -1,7 +1,8 @@
 import nre, urlly, options
 
 type
-  KVPair* = tuple[key, value: string]
+  KVPair* = ref object 
+    key*, value*: string
   ScraperRun* = proc (url: Url)
   Scraper* = ref object
     name*: string

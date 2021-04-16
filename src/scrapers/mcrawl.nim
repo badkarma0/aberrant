@@ -148,13 +148,13 @@ proc crawl_worker {.thread.} =
       dl.download
 
 scraper "mcrawl":
-  ra "brief", false
-  ra "level", 2
-  ra "pstyle"
+  arg v_start_url, "arg1", req = true, help = "an url"
+  ra "brief", false, help = "less logging for downloads"
+  ra "level", 2, help = "how many times to recurse into starting url"
+  ra "pstyle", help = "path style: can be one of [compact/c, real/r]"
   ra "dregex"
   ra "cregex"
-  arg v_map, "map", false
-  arg v_start_url, "arg1"
+  arg v_map, "map", false, help = "create a site map, no downloads"
   exec:
     if v_start_url == "":
       if not xurl.empty:
