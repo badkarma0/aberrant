@@ -8,11 +8,14 @@ import nimquery
 import puppy
 import json
 import urlly
-import nre, options, termstyle, strformat
+import nre, options, termstyle, strformat, strutils
+import http
+export base, xmltree, json, util, strformat, urlly, os, nre, strutils
 
 const 
   root = "./aberrant/"
   s_crawling* = "Crawling".negative
+  s_found* = "Found".blue
 
 let 
   default_rex = re""
@@ -59,9 +62,12 @@ template scraper*(id: string, body: untyped) =
     
     template page(spath: string, page_body: untyped) =
       var urls {.inject.}: seq[string]
+      var headers {.inject.}: seq[http.Header]
+      template header(name, val: string) =
+        headers[name] = val
       block:
         page_body
-      urls.download getDlRoot() / id / spath
+      urls.download getDlRoot() / id / spath, headers
 
     template hpage(url: Url, spath: string, hpage_body: untyped) =
       page spath:

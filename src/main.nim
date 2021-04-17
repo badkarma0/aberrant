@@ -5,7 +5,7 @@ import scrapers/s_import
 import termstyle
 import times, options, urlly, nre
 
-const version = "Aberrant v0.1.8"
+const version = "Aberrant v0.1.9"
 
 proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
   for scraper in scrapers:
@@ -45,24 +45,23 @@ proc main =
     return
   
   # dbg $pairs
-  let target = ga("arg0")
-  if target == "":
+  if v_arg0 == "":
     err &"scraper name or url required\n scraper can be one of {scrapers}"
     exit_logger()
     return
 
-  var maybe_scraper = scrapers.get_scraper(target)
+  var maybe_scraper = scrapers.get_scraper(v_arg0)
   if maybe_scraper.isSome:
     maybe_scraper.get.run()
   else:
-    maybe_scraper = scrapers.get_scraper_by_url(target)
+    maybe_scraper = scrapers.get_scraper_by_url(v_arg0)
     if maybe_scraper.isSome:
-      maybe_scraper.get.run(target)
+      maybe_scraper.get.run(v_arg0)
     else:
       log "Could not match url to any scrapers"
       log "Using the default: mcrawl"
       maybe_scraper = scrapers.get_scraper("mcrawl")
-      maybe_scraper.get.run(target)
+      maybe_scraper.get.run(v_arg0)
   exit_logger()
 
 main()

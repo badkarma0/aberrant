@@ -1,24 +1,44 @@
 import ark, lag
 import libcurl
-import os, times, strformat, termstyle, urlly, math
+import os, times, strformat, termstyle, urlly, math, strutils
 
 type
- Options* = ref object
-  overwrite: bool
- Flags* = ref object
-  skipped: bool
-  time: float
- Download* = ref object
-  url, path: string
-  opts: Options
-  flags: Flags
+  Header* = object
+    key*: string
+    value*: string
+  Options* = ref object
+    overwrite: bool
+  Flags* = ref object
+    skipped: bool
+    time: float
+  Download* = ref object
+    url*, path*: string
+    opts*: Options
+    flags*: Flags
+    headers*: seq[Header]
 
 arg v_dry, "dry", false, help = "no downloading"
+arg v_np, "np", false, help = "dont log path when downloading"
 
 var
- downloadChannel: Channel[Download]
+  downloadChannel: Channel[Download]
 downloadChannel.open()
 
+func `[]`*(headers: seq[Header], key: string): string =
+  ## Get a key out of headers. Not case sensitive.
+  ## Use a for loop to get multiple keys.
+  for header in headers:
+    if header.key.toLowerAscii() == key.toLowerAscii():
+      return header.value
+
+func `[]=`*(headers: var seq[Header], key, value: string) =
+  ## Sets a key in the headers. Not case sensitive.
+  ## If key is not there appends a new key-value pair at the end.
+  for header in headers.mitems:
+    if header.key.toLowerAscii() == key.toLowerAscii():
+      header.value = value
+      return
+  headers.add(Header(key: key, value: value))
 
 proc curl_write_file(
   buffer: cstring,
@@ -43,17 +63,24 @@ template curl(body: untyped) =
 proc xfer(data: pointer, dltot, dlnow, ultot, ulnow: float) =
   echo &"{dlnow}/{dltot}"
 
-proc download(url, path: string) =  
+proc download(url, path: string, headers: seq[Header]) =  
   var file = open(path, fmWrite)
 
   if file == nil:
     raise newException(IOError, "file is nil")
 
+  var headerList: Pslist
+  for header in headers:
+    headerList = slist_append(headerList, header.key & ": " & header.value)
+
   curl:
-    OPT_USERAGENT > "ur mom :)))))))))"
+
+    OPT_HTTPHEADER > headerList
+    OPT_USERAGENT > "Mozilla 5.0"
     OPT_HTTPGET > 1
     OPT_WRITEDATA > addr file
     OPT_WRITEFUNCTION > curl_write_file
+    OPT_FOLLOWLOCATION > 1
 
     OPT_URL > url
     # OPT_VERBOSE > 1
@@ -73,6 +100,8 @@ proc download(url, path: string) =
 
 proc `$`*(dl: Download): string =
  let a = red "=>"
+ if v_np:
+   return &"{dl.url}"
  let b = green dl.path
  result = &"{dl.url} {a} {b}"
 
@@ -107,7 +136,7 @@ proc download_base(dl: Download) =
     return
 
   let st = cpuTime()
-  download(dl.url, dl.path)
+  download(dl.url, dl.path, dl.headers)
   dl.flags.time = round(cpuTime() - st, 3)
 
 proc makeDownload*(url, path: string, opts: Options, flags: Flags): Download =
@@ -158,21 +187,25 @@ proc downloadFromChannel {.thread.} =
   let dl = data.msg
   dl.download()
 
+proc download*(urls: openArray[string], path: string, headers: seq[Header]) =
+  if urls.len <= 0:
+    return
+
+  var threads: array[10, Thread[void]]
+
+  path.createDir
+
+  for url in urls:
+    let dl = makeDownload(url, path / url.extractFilename)
+    dl.headers = headers
+    downloadChannel.send(dl)
+
+  for i in 0..threads.high:
+    createThread(threads[i], downloadFromChannel)
+  joinThreads(threads)
+
 proc download*(urls: openArray[string], path: string) =
- if urls.len <= 0:
-  return
-
- var threads: array[10, Thread[void]]
-
- path.createDir
-
- for url in urls:
-  let dl = makeDownload(url, path / url.extractFilename)
-  downloadChannel.send(dl)
-
- for i in 0..threads.high:
-  createThread(threads[i], downloadFromChannel)
- joinThreads(threads)
+  download(urls, path, @[])
 
 when isMainModule:
   const

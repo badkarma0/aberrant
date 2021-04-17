@@ -1,8 +1,6 @@
 import ../screep/scraper
-import ../screep/util
 import ../screep/jsonfs
-import urlly
-import re,strformat, termstyle, xmltree, os
+import termstyle
 
 type
   Target = ref object
@@ -54,7 +52,7 @@ proc jfs_worker {.thread.} =
     jfs = newJFS()
 
   ez_thread jfs_in_channel, request, exit_jfs_worker:
-    if request.path.startsWith r1:
+    if request.path.startsWith "write:":
       logv &"[JFS] Writing to {request.path}"
       jfs.write request.path.replace(r1,"")
       logv &"[JFS] Done writing"
@@ -94,7 +92,7 @@ proc crawl_worker {.thread.} =
     let target = item.msg
     let url = target.url
 
-    if -1 == ($url).find v_crawl_regex: continue
+    if not ($url).contains v_crawl_regex: continue
     let ss = negative &"[LVL:{target.level}|ID:{target.id}/{target_gid}]"
     log &"{s_crawling}{ss}: {url}"
 
@@ -132,7 +130,7 @@ proc crawl_worker {.thread.} =
     if v_map: continue
     
     for downl_url in downl_urls:
-      if -1 == ($downl_url).find v_downl_regex: continue
+      if not ($downl_url).contains v_downl_regex: continue
 
       var path = getDlRoot() / "mcrawl"
       case v_path_style:

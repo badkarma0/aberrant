@@ -1,8 +1,8 @@
 import os
 import urlly, strutils, termstyle
 
-import ark, lag, http
-export ark, lag, http
+import ark, lag, http, base
+export ark, lag, http, base
 
 # MISC
 
