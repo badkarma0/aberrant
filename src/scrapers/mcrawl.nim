@@ -81,12 +81,13 @@ proc crawl_worker {.thread.} =
     v_path_style = "pstyle".ga 
     v_crawl_regex = "cregex".ga.re  
     v_downl_regex = "dregex".ga.re 
-
+  lag_add_thread()
   while true:
     let item = crawl_channel.tryRecv()
     if not item.dataAvailable:
       if exit_workers:
         dbg "killing thread " & $getThreadId()
+        lag_del_thread()
         return
       continue
     let target = item.msg

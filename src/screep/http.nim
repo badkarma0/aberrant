@@ -181,11 +181,14 @@ proc download*(url, path: string, overwrite = false) =
 
 
 proc downloadFromChannel {.thread.} =
- while true:
-  let data = downloadChannel.tryRecv()
-  if not data.dataAvailable: break
-  let dl = data.msg
-  dl.download()
+  lag_add_thread()
+  while true:
+    let tried = downloadChannel.tryRecv()
+    if not tried.dataAvailable: 
+      lag_del_thread()
+      break
+    let dl = tried.msg
+    dl.download()
 
 proc download*(urls: openArray[string], path: string, headers: seq[Header]) =
   if urls.len <= 0:
