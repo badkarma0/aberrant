@@ -10,7 +10,7 @@ import json
 import urlly
 import nre, options, termstyle, strformat, strutils
 import http
-export base, xmltree, json, util, strformat, urlly, os, nre, strutils
+export base, xmltree, json, util, strformat, urlly, os, nre, strutils, termstyle
 
 const 
   root = "./aberrant/"
@@ -44,6 +44,44 @@ proc fetchJson*(url: Url): JsonNode =
   parseJson(res)
 
 
+
+# template pages*(r1, r2: int, pages_body: untyped) =
+#   for i {.inject.} in r1..r2:
+#     log &"{s_crawling} page " & $i
+#     block:
+#       pages_body
+
+# template page*(id, spath: string, page_body: untyped) =
+#   var urls {.inject.}: seq[string]
+#   var headers {.inject.}: seq[http.Header]
+#   template header(name, val: string) =
+#     headers[name] = val
+#   block:
+#     page_body
+#   urls.download getDlRoot() / id / spath, headers
+
+# template hpage*(url: Url, id, spath: string, hpage_body: untyped) =
+#   page id, spath:
+#     let data {.inject.} = fetchHtml(url)
+#     block:
+#       hpage_body
+
+# template jpage*(url: Url, id, spath: string, jpage_body: untyped) =
+#   page id, spath:
+#     let data {.inject.} = fetchJson(url)
+#     block:
+#       jpage_body
+    
+template rcase*(ms: string, body: untyped) =
+  template rof(rex: Regex, match_body: untyped) =
+    if ms.contains rex:
+      let captures {.inject.} = ms.find(rex).get.captures.toSeq
+      match_body
+      break
+  block:
+    body
+  # err &"No match found for {s}"
+
 template scraper*(id: string, body: untyped) =
   var rex {.inject.} = default_rex
   template match(xrex: Regex) =
@@ -59,7 +97,6 @@ template scraper*(id: string, body: untyped) =
         log &"{s_crawling} page " & $i
         block:
           pages_body
-    
     template page(spath: string, page_body: untyped) =
       var urls {.inject.}: seq[string]
       var headers {.inject.}: seq[http.Header]
@@ -68,13 +105,11 @@ template scraper*(id: string, body: untyped) =
       block:
         page_body
       urls.download getDlRoot() / id / spath, headers
-
     template hpage(url: Url, spath: string, hpage_body: untyped) =
       page spath:
         let data {.inject.} = fetchHtml(url)
         block:
           hpage_body
-
     template jpage(url: Url, spath: string, jpage_body: untyped) =
       page spath:
         let data {.inject.} = fetchJson(url)
@@ -89,8 +124,6 @@ template scraper*(id: string, body: untyped) =
     )
   block:
     body
-    
-
 
 import uri
 proc `/`*(urls: varargs[urlly.Url]): urlly.Url =
