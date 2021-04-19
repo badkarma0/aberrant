@@ -20,6 +20,7 @@ const
 
 var
   target_gid = 0
+  total_downloads = 0
   exit_workers = false
   exit_jfs_worker = false
   jfs_out_channel: Channel[JFSRequest]
@@ -80,7 +81,11 @@ proc crawl_worker {.thread.} =
     v_map = "map".ga false 
     v_path_style = "pstyle".ga 
     v_crawl_regex = "cregex".ga.re  
-    v_downl_regex = "dregex".ga.re 
+    v_downl_regex = "dregex".ga.re
+    v_cm = "cm".ga 0
+    v_dm = "dm".ga 0
+    v_cml = "cml".ga 0
+    v_dml = "dml".ga 0
   lag_add_thread()
   while true:
     let item = crawl_channel.tryRecv()
@@ -100,15 +105,18 @@ proc crawl_worker {.thread.} =
     logv &"Getting media from: {url}"
      
     var downl_urls: seq[Url] = @[]
+    var crawl_counter = 0
     try:
       let data = fetchHtml(url)
-      for elem in data $$ "img":
+      for elem in data $$ "img, video, source":
         let d_url = url / elem.attr("src")
         if check_if_path_exists(d_url.hostname & d_url.path):
           # dbg &"{s_skipping} {d_url}"
           continue
         # dbg "found new" & $d_url
         downl_urls.add(d_url)
+        total_downloads += 1
+        if total_downloads >= v_dm: break
       for elem in data $$ "a":
         let c_url = url / elem.attr("href")
         if check_if_path_exists(c_url.hostname & c_url.path): 
@@ -118,6 +126,7 @@ proc crawl_worker {.thread.} =
         # dbg "found new" & $c_url
         if v_level > target.level:
           crawl_channel.send c_url.makeTarget(target.level + 1)
+        if target_gid >= v_cm: break
     except Exception:
       err &"{s_crawling} {url} {s_failed}"
 
@@ -146,6 +155,8 @@ proc crawl_worker {.thread.} =
       let dl = makeDownload($downl_url, path)
       dl.download
 
+const s_max_default = "(default, 0 = infinity)"
+
 scraper "mcrawl":
   arg v_start_url, "arg1", req = true, help = "an url"
   ra "brief", false, help = "less logging for downloads"
@@ -154,6 +165,10 @@ scraper "mcrawl":
   ra "dregex"
   ra "cregex"
   arg v_map, "map", false, help = "create a site map, no downloads"
+  ra "cm", 0, help = &"maximum links to crawl {s_max_default}"
+  ra "cml", 0, help = "maximum links to crawl per level"
+  ra "dm", 0, help = "maximum links to download"
+  ra "dml", 0, help = "maximum links to download per level"
   exec:
     if v_start_url == "":
       if not xurl.empty:

@@ -8,6 +8,7 @@ type
     value*: string
   Options* = ref object
     overwrite: bool
+    show_progress: bool
   Flags* = ref object
     skipped: bool
     time: float
@@ -63,7 +64,7 @@ template curl(body: untyped) =
 proc xfer(data: pointer, dltot, dlnow, ultot, ulnow: float) =
   echo &"{dlnow}/{dltot}"
 
-proc download(url, path: string, headers: seq[Header]) =  
+proc download(url, path: string, headers: seq[Header], no_progress = 1) =  
   var file = open(path, fmWrite)
 
   if file == nil:
@@ -85,7 +86,7 @@ proc download(url, path: string, headers: seq[Header]) =
     OPT_URL > url
     # OPT_VERBOSE > 1
     # OPT_PROGRESSFUNCTION > xfer
-    # OPT_NOPROGRESS > 0
+    OPT_NOPROGRESS > no_progress
 
     let ret = curl.easy_perform()
 
@@ -99,11 +100,11 @@ proc download(url, path: string, headers: seq[Header]) =
       raise newException(Exception, "download failed")
 
 proc `$`*(dl: Download): string =
- let a = red "=>"
- if v_np:
-   return &"{dl.url}"
- let b = green dl.path
- result = &"{dl.url} {a} {b}"
+  let a = red "=>"
+  if v_np:
+    return &"{dl.url}"
+  let b = green dl.path
+  result = &"{dl.url}\n{a} {b}"
 
 proc `$$`(dl: Download): string =
  result = &"""{dl}
@@ -136,7 +137,8 @@ proc download_base(dl: Download) =
     return
 
   let st = cpuTime()
-  download(dl.url, dl.path, dl.headers)
+  let no_progress = if dl.opts.show_progress: 0 else: 1
+  download(dl.url, dl.path, dl.headers, no_progress = no_progress)
   dl.flags.time = round(cpuTime() - st, 3)
 
 proc makeDownload*(url, path: string, opts: Options, flags: Flags): Download =
@@ -147,10 +149,11 @@ proc makeDownload*(url, path: string, opts: Options, flags: Flags): Download =
     flags: flags
   )
 
-proc makeDownload*(url, path = "", overwrite = false): Download =
+proc makeDownload*(url, path = "", overwrite = false, show_progress = false): Download =
   result = makeDownload(
     url, path, Options(
-      overwrite: overwrite
+      overwrite: overwrite,
+      show_progress: show_progress
     ), Flags(
       time: 0,
       skipped: false
@@ -175,8 +178,8 @@ proc download*(dl: Download) =
  except Exception:
   err &"{s_failed}: {dl}"
 
-proc download*(url, path: string, overwrite = false) =
- download makeDownload(url, path, overwrite)
+proc download*(url, path: string, overwrite = false, show_progress = false) =
+ download makeDownload(url, path, overwrite, show_progress)
 
 
 

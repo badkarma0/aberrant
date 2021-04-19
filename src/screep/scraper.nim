@@ -92,6 +92,8 @@ template scraper*(id: string, body: untyped) =
     ra name, def, help, req, smod
     var `arg_name` {.inject.} = ga(name, def)
   template exec(exec_body: untyped) =
+    proc get_dl_path(spath: string): string =
+      return getDlRoot() / id / spath
     template pages(r1, r2: int, pages_body: untyped) =
       for i {.inject.} in r1..r2:
         log &"{s_crawling} page " & $i

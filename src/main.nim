@@ -5,7 +5,7 @@ import scrapers/s_import
 import termstyle
 import times, options, urlly, nre
 
-const version = "Aberrant v0.2.0"
+const version = "Aberrant v0.2.1"
 
 proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
   for scraper in scrapers:
@@ -14,6 +14,7 @@ proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
 
 proc get_scraper_by_url(scrapers: Scrapers, url: string): Option[Scraper] =
   for scraper in scrapers:
+    if scraper.rex.pattern == "": continue
     if url.find(scraper.rex).isSome:
       return some(scraper)
 
@@ -65,7 +66,6 @@ proc main =
       log "Using the default: mcrawl"
       maybe_scraper = scrapers.get_scraper("mcrawl")
       maybe_scraper.get.run(v_arg0)
-  echo "dying"
   exit_logger()
 
 main()

@@ -1,5 +1,5 @@
 import base
-import strformat, termstyle, illwill_thread, sequtils
+import strformat, termstyle, illwill_thread, sequtils, strutils
 # LOGGING
 
 type
@@ -16,6 +16,7 @@ type
       case cmd_kind: CommandKind
       of ckAddThead: add_thread: int
       of ckDelThread: del_thread: int
+  Messages = seq[Message]
 var
   message_channel: Channel[Message]
   lt*: Thread[void]
@@ -23,22 +24,30 @@ var
   lt_do_verbose* = false
   lt_show_thread* = true
   lt_exit = false
-  lt_tui = false
+  lt_tui* = false
 
 
-proc update_tui(iw: IllWill, threads: openArray[int], buffer: var TerminalBuffer, msg: Message) =
-  for i in 0..threads.high:
-    let tid = threads[i]
-    if msg.tid == tid:
-      # echo msg.content
-      buffer.write(2, i * 3, $msg.tid, "::", msg.content)
-  iw.display(buffer)
+proc `[]`(msgs: Messages, tid: int): Message =
+  for i in 0..msgs.high - 1:
+    if tid == msgs[i].tid:
+      return msgs[i]
+
+proc update_or_add(msgs: var Messages, tid: int, msg: Message) =
+  var i = 0
+  for m in msgs:
+    if tid == m.tid:
+      msgs[i] = msg
+      return
+    i += 1
+  msgs.add msg
+
 
 proc log_worker() {.thread.} =
   var 
     iw: IllWill
     tb: TerminalBuffer
     thread_registry: seq[int]
+    last_messages: Messages
   if lt_tui:
     iw = newIllWill()
     iw.illwillInit(fullscreen=true)
@@ -54,7 +63,7 @@ proc log_worker() {.thread.} =
           showCursor()
         break
       continue
-    let message = tried.msg
+    let message: Message = tried.msg
     if lt_tui:
       case message.kind:
       of mkCmd:
@@ -65,9 +74,21 @@ proc log_worker() {.thread.} =
           for i in 0..thread_registry.high - 1:
             if thread_registry[i] == message.del_thread:
               thread_registry.delete i
+        tb.clear()
       of mkMsg:
-        # echo message.content
-        update_tui iw, thread_registry, tb, message
+        tb.clear()
+        for tid in thread_registry:
+          if message.tid == tid:
+            last_messages.update_or_add tid, message
+            # echo message.content
+        var i = 0
+        for msg in last_messages:
+          for tid in thread_registry:
+            if msg.tid == tid:
+              tb.write(0, i * 4, $msg.tid, "::", msg.content)
+              tb.drawHorizLine(0, terminalWidth() - 2, i * 4 + 3)
+              i += 1
+        iw.display(tb)
     else:
       if lt_show_thread:
         echo &"[{message.tid}]{message.content}"
