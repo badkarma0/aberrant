@@ -37,7 +37,11 @@ proc `$$`*(node: XmlNode, q: string): seq[XmlNode] =
 
 proc fetchHtml*(url: Url): XmlNode =
   let res = fetch($url)
-  parseHtml(res)
+  let node = parseHtml(res)
+  if $node == "<document />":
+    return nil
+  else:
+    return node
 
 proc fetchJson*(url: Url): JsonNode =
   let res = fetch($url)
@@ -110,11 +114,13 @@ template scraper*(id: string, body: untyped) =
     template hpage(url: Url, spath: string, hpage_body: untyped) =
       page spath:
         let data {.inject.} = fetchHtml(url)
+        if data.isNil: return
         block:
           hpage_body
     template jpage(url: Url, spath: string, jpage_body: untyped) =
       page spath:
         let data {.inject.} = fetchJson(url)
+        if data.isNil: return
         block:
           jpage_body
     scrapers.add Scraper(

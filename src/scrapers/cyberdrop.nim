@@ -1,20 +1,42 @@
 
 import ../screep/scraper
 
+const
+  top_url = "https://cdn.cyberdrop.me/hits/"
+  base_url = "https://cyberdrop.me/"
 let
   r1 = re"\/a\/(.*)$"
+  r2 = re"top"
 
 scraper "cyberdrop":
   match re"cyberdrop.me"
   arg v_a1, "arg1", help = "url"
   exec:
     if not xurl.empty: v_a1 = $xurl
+
+    proc get_album(id: string) =
+      let url = &"{base_url}a/{id}"
+      log &"{s_found} {url}"
+      hpage url.parseUrl, "":
+        let items = data $$ ".image"
+        let title = (data $ "#title").innerText.strip
+        let base_path = &"{id}_{title}"
+        for item in items:
+          let video = item.attr "href"
+          # log &"{s_found} {video}"
+          # urls.add video
+          video.download base_path.get_dl_path / video.extractFilename, show_progress = true
+
     rcase v_a1:
       rof r1:
-        hpage v_a1.parseUrl, captures[0].get:
-          let items = data $$ ".image"
-          for item in items:
-            let video = item.attr "href"
-            # log &"{s_found} {video}"
-            # urls.add video
-            video.download captures[0].get.get_dl_path / video.extractFilename, show_progress = true
+        get_album captures[0].get
+      rof r2:
+        hpage top_url.parseUrl, "":
+          for anchor in data $$ "a":
+            let href = anchor.attr("href")
+            rcase href:
+              rof r1:
+                get_album captures[0].get
+              
+              
+            
