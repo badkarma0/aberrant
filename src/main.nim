@@ -5,7 +5,7 @@ import scrapers/s_import
 import termstyle
 import times, options, urlly, nre
 
-const version = "Aberrant v0.2.2"
+const version = "Aberrant v0.2.3"
 
 proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
   for scraper in scrapers:

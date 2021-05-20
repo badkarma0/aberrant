@@ -45,6 +45,11 @@ proc fetchHtml*(url: Url): XmlNode =
 
 proc fetchJson*(url: Url): JsonNode =
   let res = fetch($url)
+  try:
+    
+    dbg res[0..500]
+  except Exception:
+    discard  
   parseJson(res)
 
 
