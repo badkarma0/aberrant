@@ -91,41 +91,40 @@ proc curl_write_gen(
   copyMem(outbuf[][i].addr, buffer, count)
   result = size * count
 
-template T_curl(body: untyped) =
+
+template curl(body: untyped) =
   let curl {.inject.} = easy_init()
   var 
     headerData: ref string = new string
     bodyData: ref string = new string
     headerList: Pslist
-  template T_setup(sbody: untyped) =
-    template `>`(option: Option, arg: untyped) =
-      discard curl.easy_setopt(option, arg)
-    template T_set_header(key, val: string) =
-      headerList = headerList.slist_append(key & ": " & val)
-    template T_set_headers(hs: seq[Header]) =
-      for h in hs:
-        headerList = headerList.slist_append(h.key & ": " & h.val)
-    OPT_WRITEDATA > bodyData
-    OPT_WRITEHEADER > headerData
-    OPT_WRITEFUNCTION > curl_write_gen
-    OPT_HEADERFUNCTION > curl_write_gen
-    block:
-      sbody
-    OPT_HTTPHEADER > headerList
-  template T_run(rbody: untyped) =
-    let ret {.inject.} = curl.easy_perform()
-    var headers {.inject.}: seq[Header]
-    for line in headerData[].split(CRLF):
+  # template `=>`(option: Option, arg: untyped) =
+    # discard curl.easy_setopt(option, arg)
+  proc `=>`[T](option: Option, arg: T) {.varargs.} =
+    discard curl.easy_setopt(option, arg)
+  proc set_header(key, val: string) =
+    headerList = headerList.slist_append(key & ": " & val)
+  proc set_headers(hs: seq[Header]) =
+    for h in hs:
+      headerList = headerList.slist_append(h.key & ": " & h.value)
+  proc run(): Code =
+    return curl.easy_perform()
+  proc get_headers: seq[Header] =
+      for line in headerData[].split(CRLF):
         let arr = line.split(":", 1)
         if arr.len == 2:
-          headers[arr[0].strip()] = arr[1].strip()
-    var body {.inject.} = bodyData[]
-    template `>`(option: INFO, arg: untyped) =
-      discard curl.easy_getinfo(option, arg)
-    block:
-      rbody
+          result[arr[0].strip()] = arr[1].strip()
+  proc get_body: string =
+    result = bodyData[]
+  proc info[T](inf: INFO, arg: T) =
+    discard curl.easy_getinfo(inf, arg)
+  OPT_WRITEDATA => bodyData
+  OPT_WRITEHEADER => headerData
+  OPT_WRITEFUNCTION => curl_write_gen
+  OPT_HEADERFUNCTION => curl_write_gen
   block:
     body
+  OPT_HTTPHEADER => headerList
   curl.easy_cleanup()
   headerList.slist_free_all()
 
@@ -141,27 +140,26 @@ proc add_default_headers(req: Request) =
     req.headers["accept-encoding"] = "gzip"
 
 proc fetch*(req: Request): Response =
-  T_curl:
-    T_setup:
-      req.add_default_headers()
-      T_set_headers req.headers
-      OPT_URL > $req.url
-      OPT_FOLLOWLOCATION > 1
-      OPT_CUSTOMREQUEST > req.verb.toUpperAscii()
-      if req.body.len > 0:
-        OPT_POSTFIELDS > req.body
-    T_run:
-      result.url = req.url
-      if ret == E_OK:
-        var code: uint32
-        INFO_RESPONSE_CODE > code.addr
-        result.headers = headers
-        result.body = body
-        result.code = code.int
-        if result.headers["Content-Encoding"] == "gzip":
-          result.body = uncompress(result.body, dfGzip)
-      else:
-        result.error = $easy_strerror(ret)
+  curl:
+    req.add_default_headers()
+    set_headers req.headers
+    OPT_URL => $req.url
+    OPT_FOLLOWLOCATION => 1
+    OPT_CUSTOMREQUEST => req.verb.toUpperAscii()
+    if req.body.len > 0:
+      OPT_POSTFIELDS => req.body
+    let ret = run()
+    result.url = req.url
+    if ret == E_OK:
+      var code: uint32
+      INFO_RESPONSE_CODE.info code.addr
+      result.headers = get_headers()
+      result.body = get_body()
+      result.code = code.int
+      if result.headers["Content-Encoding"] == "gzip":
+        result.body = uncompress(result.body, dfGzip)
+    else:
+      result.error = $easy_strerror(ret)
 
 proc fetch*(url: string, verb = "get", headers = newSeq[Header]()): string =
   let req = Request()
@@ -182,28 +180,27 @@ proc download(url, path: string, headers: seq[Header], no_progress = 1) =
     raise newException(IOError, "file is nil")
 
   curl:
-    setup:
-      set_headers headers
+    set_headers headers
 
-      OPT_USERAGENT > "Aberrant"
-      OPT_HTTPGET > 1
-      OPT_WRITEDATA > addr file
-      OPT_WRITEFUNCTION > curl_write_file
-      OPT_FOLLOWLOCATION > 1
+    OPT_USERAGENT => "Aberrant"
+    OPT_HTTPGET => 1
+    OPT_WRITEDATA => addr file
+    OPT_WRITEFUNCTION => curl_write_file
+    OPT_FOLLOWLOCATION => 1
 
-      OPT_URL > url
-      # OPT_VERBOSE > 1
-      # OPT_PROGRESSFUNCTION > xfer
-      OPT_NOPROGRESS > no_progress
-    run:
-      file.close()
+    OPT_URL => url
+    # OPT_VERBOSE => 1
+    # OPT_PROGRESSFUNCTION => xfer
+    OPT_NOPROGRESS => no_progress
+    let ret = run()
+    file.close()
 
-      if ret == E_OK:
-        return
-        # strm.close()
-        # echo(webData[])
-      else:
-        raise newException(Exception, "download failed")
+    if ret == E_OK:
+      return
+      # strm.close()
+      # echo(webData[])
+    else:
+      raise newException(Exception, "download failed")
 
 proc `$`*(dl: Download): string =
   let a = red "=>"

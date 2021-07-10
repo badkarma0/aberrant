@@ -1,7 +1,6 @@
 import nre
 import strutils
 import math
-import puppy
 import xmltree
 import urlly
 import os

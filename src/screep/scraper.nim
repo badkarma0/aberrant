@@ -5,7 +5,6 @@ import os
 import htmlparser
 import xmltree
 import nimquery
-import puppy
 import json
 import urlly
 import nre, options, termstyle, strformat, strutils
@@ -43,7 +42,7 @@ proc fetchHtml*(url: Url): XmlNode =
   else:
     return node
 
-proc fetchJson*(url: Url, s: Session): JsonNode =
+proc fetchJson*(url: Url, s: Session = new Session): JsonNode =
   let res = fetch($url)
   try:
     
