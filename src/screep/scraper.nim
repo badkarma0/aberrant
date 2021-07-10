@@ -43,7 +43,7 @@ proc fetchHtml*(url: Url): XmlNode =
   else:
     return node
 
-proc fetchJson*(url: Url): JsonNode =
+proc fetchJson*(url: Url, s: Session): JsonNode =
   let res = fetch($url)
   try:
     

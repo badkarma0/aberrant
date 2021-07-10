@@ -2,7 +2,7 @@
 import ../screep/scraper
 
 const
-  hash_posts = "32b14723a678bd4628d70c1f877b94c9"
+  hash_posts = "ea4baf885b60cbf664b34ee760397549"
   base_url = "https://www.instagram.com"
 let
   r1 = re"instagram.com\/(.*?)\/$"

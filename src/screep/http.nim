@@ -1,11 +1,10 @@
 import ark, lag
-import libcurl
+import libcurl, zippy
 import os, times, strformat, termstyle, urlly, math, strutils
-
+import macros
 type
   Header* = object
-    key*: string
-    value*: string
+    key*, value*: string
   Options* = ref object
     overwrite: bool
     show_progress: bool
@@ -17,6 +16,20 @@ type
     opts*: Options
     flags*: Flags
     headers*: seq[Header]
+  Session* = ref object
+    headers*: seq[Header]
+    cookies*: seq[Header]
+  Request* = ref object
+    url*: Url
+    headers*: seq[Header]
+    verb*: string
+    body*: string
+  Response* = ref object
+    url*: Url
+    headers*: seq[Header]
+    code*: int
+    body*: string
+    error*: string
 
 arg v_dry, "dry", false, help = "no downloading"
 arg v_np, "np", false, help = "dont log path when downloading"
@@ -24,6 +37,8 @@ arg v_np, "np", false, help = "dont log path when downloading"
 var
   downloadChannel: Channel[Download]
 downloadChannel.open()
+
+const CRLF = "\r\n"
 
 func `[]`*(headers: seq[Header], key: string): string =
   ## Get a key out of headers. Not case sensitive.
@@ -41,6 +56,14 @@ func `[]=`*(headers: var seq[Header], key, value: string) =
       return
   headers.add(Header(key: key, value: value))
 
+proc set_header*(s: Session, key, value: string) =
+  s.headers[key] = value
+
+proc set_cookie*(s: Session, key, value: string) =
+  s.cookies[key] = value
+  s.headers["cookie"] = s.cookies.join("; ") 
+
+
 proc curl_write_file(
   buffer: cstring,
   size: int,
@@ -50,19 +73,107 @@ proc curl_write_file(
   let outbuf = cast[ptr File](outstream)
   let wsize = outbuf[].writeBuffer(buffer, count)
   if wsize != count:
-    raise newException(Exception, &"fucking died lmao, {wsize}, {count}")
+    raise newException(Exception, &"fucking died lmao, file write {wsize}, {count}")
   result = size * count
 
-template curl(body: untyped) =
+proc curl_write_gen(
+  buffer: cstring,
+  size: int,
+  count: int,
+  outstream: pointer
+): int =
+  if size != 1:
+    raise newException(Exception, &"fucking died lmao, gen write {count}")
+  let 
+    outbuf = cast[ref string](outstream)
+    i = outbuf[].len
+  outbuf[].setLen(outbuf[].len + count)
+  copyMem(outbuf[][i].addr, buffer, count)
+  result = size * count
+
+template T_curl(body: untyped) =
   let curl {.inject.} = easy_init()
-  template `>`(option: Option, arg: untyped) =
-    discard curl.easy_setopt(option, arg)
+  var 
+    headerData: ref string = new string
+    bodyData: ref string = new string
+    headerList: Pslist
+  template T_setup(sbody: untyped) =
+    template `>`(option: Option, arg: untyped) =
+      discard curl.easy_setopt(option, arg)
+    template T_set_header(key, val: string) =
+      headerList = headerList.slist_append(key & ": " & val)
+    template T_set_headers(hs: seq[Header]) =
+      for h in hs:
+        headerList = headerList.slist_append(h.key & ": " & h.val)
+    OPT_WRITEDATA > bodyData
+    OPT_WRITEHEADER > headerData
+    OPT_WRITEFUNCTION > curl_write_gen
+    OPT_HEADERFUNCTION > curl_write_gen
+    block:
+      sbody
+    OPT_HTTPHEADER > headerList
+  template T_run(rbody: untyped) =
+    let ret {.inject.} = curl.easy_perform()
+    var headers {.inject.}: seq[Header]
+    for line in headerData[].split(CRLF):
+        let arr = line.split(":", 1)
+        if arr.len == 2:
+          headers[arr[0].strip()] = arr[1].strip()
+    var body {.inject.} = bodyData[]
+    template `>`(option: INFO, arg: untyped) =
+      discard curl.easy_getinfo(option, arg)
+    block:
+      rbody
   block:
     body
   curl.easy_cleanup()
+  headerList.slist_free_all()
+
 
 proc xfer(data: pointer, dltot, dlnow, ultot, ulnow: float) =
   echo &"{dlnow}/{dltot}"
+
+proc add_default_headers(req: Request) =
+  if req.headers["user-agent"].len == 0:
+    req.headers["user-agent"] = "Aberrant"
+  if req.headers["accept-encoding"].len == 0:
+    # If there isn't a specific accept-encoding specified, enable gzip
+    req.headers["accept-encoding"] = "gzip"
+
+proc fetch*(req: Request): Response =
+  T_curl:
+    T_setup:
+      req.add_default_headers()
+      T_set_headers req.headers
+      OPT_URL > $req.url
+      OPT_FOLLOWLOCATION > 1
+      OPT_CUSTOMREQUEST > req.verb.toUpperAscii()
+      if req.body.len > 0:
+        OPT_POSTFIELDS > req.body
+    T_run:
+      result.url = req.url
+      if ret == E_OK:
+        var code: uint32
+        INFO_RESPONSE_CODE > code.addr
+        result.headers = headers
+        result.body = body
+        result.code = code.int
+        if result.headers["Content-Encoding"] == "gzip":
+          result.body = uncompress(result.body, dfGzip)
+      else:
+        result.error = $easy_strerror(ret)
+
+proc fetch*(url: string, verb = "get", headers = newSeq[Header]()): string =
+  let req = Request()
+  req.url = parseUrl(url)
+  req.verb = verb
+  req.headers = headers
+  let res = req.fetch()
+  if res.code == 200:
+    return res.body
+
+proc isOk*(res: Response): bool =
+  return res.error.len == 0 and 200 < res.code and res.code > 299
 
 proc download(url, path: string, headers: seq[Header], no_progress = 1) =  
   var file = open(path, fmWrite)
@@ -70,34 +181,29 @@ proc download(url, path: string, headers: seq[Header], no_progress = 1) =
   if file == nil:
     raise newException(IOError, "file is nil")
 
-  var headerList: Pslist
-  for header in headers:
-    headerList = slist_append(headerList, header.key & ": " & header.value)
-
   curl:
+    setup:
+      set_headers headers
 
-    OPT_HTTPHEADER > headerList
-    OPT_USERAGENT > "Mozilla 5.0"
-    OPT_HTTPGET > 1
-    OPT_WRITEDATA > addr file
-    OPT_WRITEFUNCTION > curl_write_file
-    OPT_FOLLOWLOCATION > 1
+      OPT_USERAGENT > "Aberrant"
+      OPT_HTTPGET > 1
+      OPT_WRITEDATA > addr file
+      OPT_WRITEFUNCTION > curl_write_file
+      OPT_FOLLOWLOCATION > 1
 
-    OPT_URL > url
-    # OPT_VERBOSE > 1
-    # OPT_PROGRESSFUNCTION > xfer
-    OPT_NOPROGRESS > no_progress
+      OPT_URL > url
+      # OPT_VERBOSE > 1
+      # OPT_PROGRESSFUNCTION > xfer
+      OPT_NOPROGRESS > no_progress
+    run:
+      file.close()
 
-    let ret = curl.easy_perform()
-
-    file.close()
-
-    if ret == E_OK:
-      return
-      # strm.close()
-      # echo(webData[])
-    else:
-      raise newException(Exception, "download failed")
+      if ret == E_OK:
+        return
+        # strm.close()
+        # echo(webData[])
+      else:
+        raise newException(Exception, "download failed")
 
 proc `$`*(dl: Download): string =
   let a = red "=>"
