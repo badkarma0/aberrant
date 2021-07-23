@@ -45,7 +45,6 @@ proc fetchHtml*(url: Url): XmlNode =
 proc fetchJson*(url: Url, s: Session = new Session): JsonNode =
   let res = fetch($url)
   try:
-    
     dbg res[0..500]
   except Exception:
     discard  
@@ -118,13 +117,11 @@ template scraper*(id: string, body: untyped) =
     template hpage(url: Url, spath: string, hpage_body: untyped) =
       page spath:
         let data {.inject.} = fetchHtml(url)
-        if data.isNil: return
         block:
           hpage_body
     template jpage(url: Url, spath: string, jpage_body: untyped) =
       page spath:
         let data {.inject.} = fetchJson(url)
-        if data.isNil: return
         block:
           jpage_body
     scrapers.add Scraper(

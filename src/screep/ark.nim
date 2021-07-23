@@ -14,10 +14,14 @@ type
 var r_args: Args
 
 proc print(arg: Arg) =
-  var rs = ""
+  var 
+    rs = ""
+    d = ""
   if arg.req:
     rs = "*"
-  echo &"{arg.name}\t\t{rs}\t {arg.kind}\t\t{arg.help}"
+  # if not arg.def.isNil:
+  #   d = " (default: " & $arg.def & ")"
+  echo &"{arg.name}\t\t{rs}\t {arg.kind}\t\t{arg.help}{d}"
 
 proc print_mod(s: string) =
   echo bold negative &"\n {s}"

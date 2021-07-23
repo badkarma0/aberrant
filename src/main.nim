@@ -4,8 +4,9 @@ import strformat, strutils
 import scrapers/s_import
 import termstyle
 import times, options, urlly, nre
+from libcurl import version
 
-const version = "Aberrant v0.2.3"
+const version = "Aberrant v0.2.4"
 
 proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
   for scraper in scrapers:
@@ -35,10 +36,15 @@ proc run_by_url(url: string) =
     maybe_scraper = scrapers.get_scraper("mcrawl")
     maybe_scraper.get.run(url)
 
+proc cleanup =
+  exit_logger()
+
+
 proc main =
   ra "debug", false, help = "debug logging"
   ra "verbose", false, help = "verbose logging"
   arg v_help, "help", false, help = "show this menu"
+  arg v_version, "version", false, help = "print version"
   arg v_arg0, "arg0", help = &"scraper name or url\n scraper can be one of {scrapers}", req = true
   arg v_tui, "tui", false, help = &"use terminal user interface"
   arg v_file, "file", help = "read links from file"
@@ -48,13 +54,15 @@ proc main =
 
   let a = red version
   # echo &"=== [ {a} ] ==="
-
+  if v_version:
+    echo version
+    echo libcurl.version()
+    return
   if v_help:
-    print_help("some web scrapers\nur mom")
+    print_help(&"some web scrapers\nur mom")
     return
 
   init_logger(v_tui)
-
   # if arg_starup_check():
   #   exit_logger()
   #   return
@@ -67,14 +75,21 @@ proc main =
   # dbg $pairs
   if v_arg0 == "":
     err &"Error scraper name or url required\n scraper can be one of {scrapers}"
-    exit_logger()
+    cleanup()
     return
 
   var maybe_scraper = scrapers.get_scraper(v_arg0)
-  if maybe_scraper.isSome:
-    maybe_scraper.get.run()
-  else:
-    v_arg0.run_by_url()
-  exit_logger()
+  try:
+    if maybe_scraper.isSome:
+      maybe_scraper.get.run()
+    else:
+      v_arg0.run_by_url()
+    cleanup()
+  except:
+    cleanup()
+    echo "FATAL: " & $getCurrentException().name 
+    echo getCurrentException().getStackTrace()
+    echo getCurrentExceptionMsg()
+
 
 main()

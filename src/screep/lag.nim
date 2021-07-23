@@ -1,5 +1,6 @@
 import base
 import strformat, termstyle, illwill_thread, sequtils, strutils
+import tables
 # LOGGING
 
 type
@@ -47,7 +48,7 @@ proc log_worker() {.thread.} =
     iw: IllWill
     tb: TerminalBuffer
     thread_registry: seq[int]
-    last_messages: Messages
+    last_messages: Table[int, Message]
   if lt_tui:
     iw = newIllWill()
     iw.illwillInit(fullscreen=true)
@@ -77,17 +78,14 @@ proc log_worker() {.thread.} =
         tb.clear()
       of mkMsg:
         tb.clear()
-        for tid in thread_registry:
-          if message.tid == tid:
-            last_messages.update_or_add tid, message
-            # echo message.content
+        if not (message.tid in thread_registry):
+          break
+        last_messages[message.tid] = message
         var i = 0
-        for msg in last_messages:
-          for tid in thread_registry:
-            if msg.tid == tid:
-              tb.write(0, i * 4, $msg.tid, "::", msg.content)
-              tb.drawHorizLine(0, terminalWidth() - 2, i * 4 + 3)
-              i += 1
+        for msg in last_messages.values:
+          tb.write(0, i * 4, $msg.tid, "::", msg.content)
+          tb.drawHorizLine(0, terminalWidth() - 2, i * 4 + 3)
+          i += 1
         iw.display(tb)
     else:
       if lt_show_thread:

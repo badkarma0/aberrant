@@ -2,12 +2,13 @@ import ark, lag
 import libcurl, zippy
 import os, times, strformat, termstyle, urlly, math, strutils
 import macros
+import httpclient
 type
   Header* = object
     key*, value*: string
   Options* = ref object
-    overwrite: bool
-    show_progress: bool
+    overwrite*: bool
+    show_progress*: bool
   Flags* = ref object
     skipped: bool
     time: float
@@ -30,14 +31,20 @@ type
     code*: int
     body*: string
     error*: string
+  CurlRequest = ref object
+    curl: Pcurl
+    headerData: ref string
+    bodyData: ref string
+    headerList: Pslist
 
 arg v_dry, "dry", false, help = "no downloading"
 arg v_np, "np", false, help = "dont log path when downloading"
 
 var
   downloadChannel: Channel[Download]
-downloadChannel.open()
+  httpCclient = newHttpClient()
 
+downloadChannel.open()
 const CRLF = "\r\n"
 
 func `[]`*(headers: seq[Header], key: string): string =
@@ -63,6 +70,20 @@ proc set_cookie*(s: Session, key, value: string) =
   s.cookies[key] = value
   s.headers["cookie"] = s.cookies.join("; ") 
 
+proc `$`*(req: Request): string =
+  ## Turns a req into the HTTP wire format.
+  var path = req.url.path
+  if path == "":
+    path = "/"
+  if req.url.query.len > 0:
+    path.add "?"
+    path.add req.url.search
+
+  result.add "GET " & path & " HTTP/1.1" & CRLF
+  result.add "Host: " & req.url.hostname & CRLF
+  for header in req.headers:
+    result.add header.key & ": " & header.value & CRLF
+  result.add CRLF
 
 proc curl_write_file(
   buffer: cstring,
@@ -91,75 +112,90 @@ proc curl_write_gen(
   copyMem(outbuf[][i].addr, buffer, count)
   result = size * count
 
-
-template curl(body: untyped) =
-  let curl {.inject.} = easy_init()
-  var 
-    headerData: ref string = new string
-    bodyData: ref string = new string
-    headerList: Pslist
-  # template `=>`(option: Option, arg: untyped) =
-    # discard curl.easy_setopt(option, arg)
-  proc `=>`[T](option: Option, arg: T) {.varargs.} =
-    discard curl.easy_setopt(option, arg)
-  proc set_header(key, val: string) =
-    headerList = headerList.slist_append(key & ": " & val)
-  proc set_headers(hs: seq[Header]) =
-    for h in hs:
-      headerList = headerList.slist_append(h.key & ": " & h.value)
-  proc run(): Code =
-    return curl.easy_perform()
-  proc get_headers: seq[Header] =
-      for line in headerData[].split(CRLF):
-        let arr = line.split(":", 1)
-        if arr.len == 2:
-          result[arr[0].strip()] = arr[1].strip()
-  proc get_body: string =
-    result = bodyData[]
-  proc info[T](inf: INFO, arg: T) =
-    discard curl.easy_getinfo(inf, arg)
-  OPT_WRITEDATA => bodyData
-  OPT_WRITEHEADER => headerData
-  OPT_WRITEFUNCTION => curl_write_gen
-  OPT_HEADERFUNCTION => curl_write_gen
-  block:
-    body
-  OPT_HTTPHEADER => headerList
-  curl.easy_cleanup()
-  headerList.slist_free_all()
-
-
 proc xfer(data: pointer, dltot, dlnow, ultot, ulnow: float) =
   echo &"{dlnow}/{dltot}"
+
+# CurlRequest methods
+
+template opt(cr: CurlRequest, o: Option, x: typed) =
+  discard cr.curl.easy_setopt(o,x)
+
+template opts(cr: CurlRequest, body: untyped) =
+  proc `=>`[T](option: Option, arg: T) {.varargs.} =
+    discard cr.curl.easy_setopt(option, arg)
+  block:body
+
+proc curl_request: CurlRequest  =
+  let cr = CurlRequest()
+  cr.curl = easy_init()
+  cr.headerData = new string
+  cr.bodyData = new string
+  opt cr, OPT_WRITEDATA, cr.bodyData
+  opt cr, OPT_WRITEHEADER, cr.headerData
+  opt cr, OPT_WRITEFUNCTION, curl_write_gen
+  opt cr, OPT_HEADERFUNCTION, curl_write_gen
+  opt cr, OPT_USERAGENT, "Aberrant (curl)"
+  when defined(windows):
+    opt cr, OPT_CAINFO, "cacert.pem"
+  cr
+
+proc set_headers(cr: CurlRequest, hs: seq[Header]) =
+  for h in hs:
+    cr.headerList = cr.headerList.slist_append(h.key & ": " & h.value)
+  opt cr, OPT_HTTPHEADER, cr.headerList
+
+proc get_headers(cr: CurlRequest): seq[Header] =
+  for line in cr.headerData[].split(CRLF):
+    let arr = line.split(":", 1)
+    if arr.len == 2:
+      result[arr[0].strip()] = arr[1].strip()
+proc get_body(cr: CurlRequest): string =
+  cr.bodyData[]
+
+
+proc cleanup(cr: CurlRequest) =
+  cr.curl.easy_cleanup()
+  cr.headerList.slist_free_all()
+
+proc run(cr: CurlRequest): Code =
+  cr.curl.easy_perform()
+
+# END CurlRequest methods
 
 proc add_default_headers(req: Request) =
   if req.headers["user-agent"].len == 0:
     req.headers["user-agent"] = "Aberrant"
-  if req.headers["accept-encoding"].len == 0:
-    # If there isn't a specific accept-encoding specified, enable gzip
-    req.headers["accept-encoding"] = "gzip"
+  # if req.headers["accept-encoding"].len == 0:
+  #   # If there isn't a specific accept-encoding specified, enable gzip
+  #   req.headers["accept-encoding"] = "gzip"
 
-proc fetch*(req: Request): Response =
-  curl:
-    req.add_default_headers()
-    set_headers req.headers
+proc fetch*(req: Request): Response {.gcsafe.} =
+  result = Response()
+  # var client = newHttpClient();
+  # result.body = client.getContent($req.url)
+  # return result
+  let cr = curl_request()
+  opts cr:
     OPT_URL => $req.url
     OPT_FOLLOWLOCATION => 1
     OPT_CUSTOMREQUEST => req.verb.toUpperAscii()
     if req.body.len > 0:
       OPT_POSTFIELDS => req.body
-    let ret = run()
-    result.url = req.url
-    if ret == E_OK:
-      var code: uint32
-      INFO_RESPONSE_CODE.info code.addr
-      result.headers = get_headers()
-      result.body = get_body()
-      result.code = code.int
-      if result.headers["Content-Encoding"] == "gzip":
-        result.body = uncompress(result.body, dfGzip)
-    else:
-      result.error = $easy_strerror(ret)
+  
+  let ret = cr.run()
+
+  result.url = req.url
+  if ret == E_OK:
+    var code: uint32
+    discard cr.curl.easy_getinfo(INFO_RESPONSE_CODE, code.addr)
+    result.headers = cr.get_headers()
+    result.body = cr.get_body()
+    result.code = code.int
+    if result.headers["Content-Encoding"] == "gzip":
+      result.body = uncompress(result.body, dfGzip)
+  else:
+    result.error = $easy_strerror(ret)
+  cr.cleanup()
 
 proc fetch*(url: string, verb = "get", headers = newSeq[Header]()): string =
   let req = Request()
@@ -179,28 +215,24 @@ proc download(url, path: string, headers: seq[Header], no_progress = 1) =
   if file == nil:
     raise newException(IOError, "file is nil")
 
-  curl:
-    set_headers headers
-
-    OPT_USERAGENT => "Aberrant"
+  let cr = curl_request()
+  opts cr:
     OPT_HTTPGET => 1
     OPT_WRITEDATA => addr file
     OPT_WRITEFUNCTION => curl_write_file
     OPT_FOLLOWLOCATION => 1
-
     OPT_URL => url
     # OPT_VERBOSE => 1
     # OPT_PROGRESSFUNCTION => xfer
     OPT_NOPROGRESS => no_progress
-    let ret = run()
-    file.close()
+  cr.set_headers(headers)
+  dbg $cr.headerList.data
+  let ret = cr.run()
+  file.close()
+  cr.cleanup()
 
-    if ret == E_OK:
-      return
-      # strm.close()
-      # echo(webData[])
-    else:
-      raise newException(Exception, "download failed")
+  if ret != E_OK:
+    raise newException(Exception, "download failed")
 
 proc `$`*(dl: Download): string =
   let a = red "=>"
@@ -305,7 +337,8 @@ proc download*(urls: openArray[string], path: string, headers: seq[Header]) =
   path.createDir
 
   for url in urls:
-    let dl = makeDownload(url, path / url.extractFilename)
+    let p = url.parseUrl
+    let dl = makeDownload(url, path / p.path.extractFilename)
     dl.headers = headers
     downloadChannel.send(dl)
 

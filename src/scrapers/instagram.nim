@@ -1,5 +1,6 @@
 
 import ../screep/scraper
+import times
 
 const
   hash_posts = "ea4baf885b60cbf664b34ee760397549"
@@ -21,6 +22,16 @@ proc ex_user(n: JsonNode): JsonNode =
 proc ex_timeline(n: JsonNode): JsonNode =
   n.ex_user["edge_owner_to_timeline_media"]
 
+proc ex_stories(n: JsonNode): JsonNode =
+  n.ex_user["edge_felix_video_timeline"]
+
+proc get_session(user, pass: string): Session =
+  # let res = fetch(base_url & "/accounts/login/")
+  
+  # let t = getTime().toUnix()
+  # let enc_pass = &"#PWD_INSTAGRAM_BROWSER:0:{t}:{pass}"
+  discard
+
 scraper "instagram":
   arg v_ar1, "arg1"
   match re"instagram.com"
@@ -32,18 +43,23 @@ scraper "instagram":
         api_url_user.query["__a"] = "1"
         var page_url = api_url_user
         var user_id = ""
+        log $page_url
         while not page_url.empty:
-          dbg $page_url
           jpage page_url, captures[0].get:
             if user_id == "":
               user_id = data.ex_user["id"].getStr
             let timeline = data.ex_timeline
-            for node in timeline["edges"].getElems:
+            let stories = data.ex_stories
+
+            # add timeline media
+            for cnode in timeline["edges"].getElems:
               try:
+                let node = cnode["node"]
                 let du = node["display_url"].getStr
                 urls.add du
               except Exception:
-                discard
+                err getCurrentExceptionMsg()
+                
             if timeline["page_info"]["has_next_page"].getBool:
               let cur = timeline["page_info"]["end_cursor"].getStr
               page_url = user_id.get_posts(cur).parseUrl
