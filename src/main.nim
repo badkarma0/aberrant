@@ -4,9 +4,10 @@ import strformat, strutils
 import scrapers/s_import
 import termstyle
 import times, options, urlly, nre
+import os
 from libcurl import version
 
-const version = "Aberrant v0.2.4"
+const version = "Aberrant v0.2.5"
 
 proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
   for scraper in scrapers:
@@ -43,14 +44,16 @@ proc cleanup =
 proc main =
   ra "debug", false, help = "debug logging"
   ra "verbose", false, help = "verbose logging"
+  ra "trace", false, help = "show trace with debug logging"
   arg v_help, "help", false, help = "show this menu"
   arg v_version, "version", false, help = "print version"
   arg v_arg0, "arg0", help = &"scraper name or url\n scraper can be one of {scrapers}", req = true
   arg v_tui, "tui", false, help = &"use terminal user interface"
   arg v_file, "file", help = "read links from file"
+  arg v_dl, "dl", help = "download a file"
   lt_do_debug = ga("debug", false)
   lt_do_verbose = ga("verbose", false)
-
+  lt_do_trace = ga("trace", false)
 
   let a = red version
   # echo &"=== [ {a} ] ==="
@@ -66,6 +69,11 @@ proc main =
   # if arg_starup_check():
   #   exit_logger()
   #   return
+
+  if v_dl != "":
+    makeDownload(v_dl, v_dl.extractFilename, overwrite=true, show_progress = true).download
+    cleanup()
+    return
 
   if v_file != "":
     let file = open(v_file, fmRead)

@@ -23,6 +23,7 @@ var
   lt*: Thread[void]
   lt_do_debug* = false
   lt_do_verbose* = false
+  lt_do_trace* = false
   lt_show_thread* = true
   lt_exit = false
   lt_tui* = false
@@ -93,23 +94,33 @@ proc log_worker() {.thread.} =
       else:
         echo message.content
 
-
-template ln(n: string) =
+proc ln(n: string)=
   message_channel.send(Message(kind: mkMsg, tid: getThreadId(), content: n))
 
-proc log*(msg: string) =
-  ln "[LOG] " & msg
+template log*(msg: varargs[string, `$`]) =
+  ln "[LOG] " & msg.join(" ")
 
-proc err*(msg: string) =
-  ln red("[ERR] ") & msg
+template err*(msg: varargs[string, `$`]) =
+  ln "[ERR] ".red & msg.join(" ")
 
-proc logv*(msg: string) =
+template logv*(msg: varargs[string, `$`]) =
   if lt_do_verbose:
-    ln "[LOG] " & msg
+    ln "[LOG] " & msg.join(" ")
 
-proc dbg*(msg: string) =
+template dbg*(msgs: varargs[string, `$`]) =
   if lt_do_debug:
-    ln yellow("[DBG] ") & msg
+    var msg = msgs.join(" ")
+    if lt_do_trace:
+      var st = getStackTraceEntries()
+      let s = st[st.len-2]
+      msg &= italic("\n-> " & $s.filename & ":" & $s.line)
+    ln "[DBG] ".yellow & msg
+
+template dbg_exception* =
+  var m = "Exception: ".red & $getCurrentException().name & "\n" 
+  m &= getCurrentException().getStackTrace() & "\n"
+  m &= getCurrentExceptionMsg() & "\n"
+  dbg m
 
 template send_cmd(x_cmd_kind: CommandKind, key: untyped, value: untyped) =
   message_channel.send(Message(kind: mkCmd, cmd_kind: x_cmd_kind, key: value))
@@ -121,8 +132,6 @@ proc lag_del_thread*(id = getThreadId()) =
 proc lag_add_thread*(id = getThreadId()) =
   if lt_tui:
     send_cmd ckAddThead, add_thread, id
-
-
 
 # proc exit_tui {.noconv.} =
 #   illwillDeinit()

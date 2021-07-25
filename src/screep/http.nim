@@ -1,14 +1,13 @@
+# libcurl wrapper for downloading and http requests
 import ark, lag
 import libcurl, zippy
 import os, times, strformat, termstyle, urlly, math, strutils
-import macros
 import httpclient
 type
   Header* = object
     key*, value*: string
   Options* = ref object
-    overwrite*: bool
-    show_progress*: bool
+    overwrite*, show_progress*, chunked*: bool
   Flags* = ref object
     skipped: bool
     time: float
@@ -36,10 +35,19 @@ type
     headerData: ref string
     bodyData: ref string
     headerList: Pslist
+  CurlRange = ref object
+    file: File
+    cur: int
+    total: int
+    str: string
 
 arg v_dry, "dry", false, help = "no downloading"
 arg v_np, "np", false, help = "dont log path when downloading"
-
+arg v_chunked, "chunked", false, help = "chunked download (might be faster)"
+arg v_show_progress, "progress", false, help = "show progress"
+arg v_curl_verbose, "curl-verbose", false, help = "curl verbose"
+ra "chunk-size", "", help = "if chunked, chunk size"
+arg v_chunk_count, "chunk-count", 0, help = "if chunked, chunk count, overwrites chunk-size"
 var
   downloadChannel: Channel[Download]
   httpCclient = newHttpClient()
@@ -85,6 +93,45 @@ proc `$`*(req: Request): string =
     result.add header.key & ": " & header.value & CRLF
   result.add CRLF
 
+proc `$`*(dl: Download): string =
+  let a = red "=>"
+  if v_np:
+    return &"{dl.url}"
+  let b = green dl.path
+  result = &"{dl.url}\n{a} {b}"
+
+proc `$$`(dl: Download): string =
+ result = &"""{dl}
+    \n\toverwrite = {dl.opts.overwrite}
+  """
+
+const byteUnits = ['B', 'K', 'M', 'G', 'T', 'P', 'E']
+func bytesToHR(byts: BiggestInt): string =
+ var bytes = byts
+ var i = 0
+ while bytes > 1024:
+  bytes = bytes div 1024
+  i += 1
+ $bytes & byteUnits[i]
+
+func HRtoBytes(s: string): int =
+  var hr = s.strip
+  let c = hr[hr.len-1]
+  if c.isDigit:
+    return hr.parseInt
+  let i = byteUnits.find(c)
+  let n = hr[0.. hr.len-2].parseInt
+  if i == -1: return n
+  debugEcho n,i
+  pow(1024.toFloat, i.toFloat).toInt * n
+    
+
+const
+  s_skipped = italic("Skipped")
+  s_downloaded = bold("Downloaded")
+  s_failed = "Failed".style(termRed & termNegative)
+
+
 proc curl_write_file(
   buffer: cstring,
   size: int,
@@ -96,6 +143,22 @@ proc curl_write_file(
   if wsize != count:
     raise newException(Exception, &"fucking died lmao, file write {wsize}, {count}")
   result = size * count
+
+proc curl_write_file_chunked(
+  buffer: cstring,
+  size: int,
+  count: int,
+  outstream: pointer
+): int =  
+  let crange = cast[ptr CurlRange](outstream)[]
+  crange.file.setFilePos crange.cur
+  let wsize = crange.file.writeBuffer(buffer, count)
+  # crange.total = 1
+  crange.file.flushFile()
+  if wsize != count:
+    raise newException(Exception, &"fucking died lmao, file write {wsize}, {count}")
+  crange.cur += wsize 
+  size * count
 
 proc curl_write_gen(
   buffer: cstring,
@@ -125,7 +188,7 @@ template opts(cr: CurlRequest, body: untyped) =
     discard cr.curl.easy_setopt(option, arg)
   block:body
 
-proc curl_request: CurlRequest  =
+proc curl_easy_request: CurlRequest  =
   let cr = CurlRequest()
   cr.curl = easy_init()
   cr.headerData = new string
@@ -135,14 +198,21 @@ proc curl_request: CurlRequest  =
   opt cr, OPT_WRITEFUNCTION, curl_write_gen
   opt cr, OPT_HEADERFUNCTION, curl_write_gen
   opt cr, OPT_USERAGENT, "Aberrant (curl)"
+  if v_curl_verbose:
+    opt cr, OPT_VERBOSE, 1
   when defined(windows):
     opt cr, OPT_CAINFO, "cacert.pem"
   cr
+
+proc set_header(cr: CurlRequest, k,v:string)  =
+  cr.headerList = cr.headerList.slist_append(k & ": " & v)
+  opt cr, OPT_HTTPHEADER, cr.headerList
 
 proc set_headers(cr: CurlRequest, hs: seq[Header]) =
   for h in hs:
     cr.headerList = cr.headerList.slist_append(h.key & ": " & h.value)
   opt cr, OPT_HTTPHEADER, cr.headerList
+  
 
 proc get_headers(cr: CurlRequest): seq[Header] =
   for line in cr.headerData[].split(CRLF):
@@ -163,25 +233,22 @@ proc run(cr: CurlRequest): Code =
 # END CurlRequest methods
 
 proc add_default_headers(req: Request) =
-  if req.headers["user-agent"].len == 0:
-    req.headers["user-agent"] = "Aberrant"
-  # if req.headers["accept-encoding"].len == 0:
-  #   # If there isn't a specific accept-encoding specified, enable gzip
-  #   req.headers["accept-encoding"] = "gzip"
+  if req.headers["accept-encoding"].len == 0:
+    # If there isn't a specific accept-encoding specified, enable gzip
+    req.headers["accept-encoding"] = "gzip"
 
 proc fetch*(req: Request): Response {.gcsafe.} =
   result = Response()
-  # var client = newHttpClient();
-  # result.body = client.getContent($req.url)
-  # return result
-  let cr = curl_request()
+
+  req.add_default_headers()
+  let cr = curl_easy_request()
   opts cr:
     OPT_URL => $req.url
     OPT_FOLLOWLOCATION => 1
     OPT_CUSTOMREQUEST => req.verb.toUpperAscii()
     if req.body.len > 0:
       OPT_POSTFIELDS => req.body
-  
+  cr.set_headers req.headers
   let ret = cr.run()
 
   result.url = req.url
@@ -197,6 +264,18 @@ proc fetch*(req: Request): Response {.gcsafe.} =
     result.error = $easy_strerror(ret)
   cr.cleanup()
 
+# do a HEAD request
+proc head*(req: Request): seq[Header] =
+  # req.headers["Connection"] = "close"
+  let cr = curl_easy_request()
+  opts cr:
+    OPT_URL => $req.url
+    OPT_NOBODY => 1
+    OPT_FOLLOWLOCATION => 1
+  cr.set_headers req.headers
+  discard cr.run()
+  cr.get_headers()
+
 proc fetch*(url: string, verb = "get", headers = newSeq[Header]()): string =
   let req = Request()
   req.url = parseUrl(url)
@@ -209,24 +288,113 @@ proc fetch*(url: string, verb = "get", headers = newSeq[Header]()): string =
 proc isOk*(res: Response): bool =
   return res.error.len == 0 and 200 < res.code and res.code > 299
 
-proc download(url, path: string, headers: seq[Header], no_progress = 1) =  
-  var file = open(path, fmWrite)
+proc curl_download_chunked*(dl: Download) =
+  let req = Request()
+  req.url = dl.url.parseUrl
+  req.headers = dl.headers
+  let headers = req.head 
+  dbg headers
+  let fr = headers["Content-Length"].parseInt
+  let cm = multi_init()
+
+  var 
+    chunk_size:int = "10M".HRtoBytes
+    v_chunk_size = ga"chunk-size"
+  if v_chunk_count != 0:
+    chunk_size = toInt fr / v_chunk_count
+  elif v_chunk_size != "":
+    chunk_size = v_chunk_size.HRtoBytes
+
+  # generate ranges
+  var 
+    c = fr
+    i = 0
+    ranges: seq[CurlRange]
+  while c > 0:
+    var crange = CurlRange()
+    ranges.add crange
+    if chunk_size > c:
+      crange.cur = fr - c
+      crange.str = $(i * chunk_size) & "-"
+    else:
+      crange.cur = i * chunk_size
+      crange.str = $(i * chunk_size) & "-" & $((i + 1) * chunk_size)
+
+    var f = open(dl.path, fmWrite)
+    crange.file = f
+
+    i+=1
+    c -= chunk_size
+
+  # create an easy for each range
+  var crs: seq[CurlRequest]
+  for crange in ranges:
+    var cr = curl_easy_request()
+    crs.add cr
+    opts cr:
+      OPT_URL => dl.url
+      OPT_HTTPGET => 1
+      OPT_FOLLOWLOCATION => 1
+      OPT_WRITEDATA => crange.unsafeAddr
+      OPT_WRITEFUNCTION => curl_write_file_chunked
+    cr.set_headers(dl.headers)
+    cr.set_header("range", "bytes="&crange.str)
+    discard cm.multi_add_handle cr.curl
+
+  # wait 
+  var 
+    hc:int32 = 1
+    mc: int32
+    code: Mcode
+  discard cm.multi_perform(hc)
+  
+  while hc != 0:
+    # dbg "polling", hc
+    sleep 100
+    # code = cm.multi_poll(Waitfd(), 0, 1000, hc)
+    # dbg code
+    code = cm.multi_perform(hc)
+    # dbg code
+
+  # cleanup
+  for cr in crs:
+    cr.cleanup
+  for r in ranges:
+    dbg r.total, r.cur
+    r.file.close()
+
+  return
+
+proc curl_download*(dl: Download) =  
+  var file = open(dl.path, fmWrite)
 
   if file == nil:
     raise newException(IOError, "file is nil")
 
-  let cr = curl_request()
+  
+
+  if dl.opts.chunked or v_chunked:
+    file.close()
+    try:
+      dl.curl_download_chunked
+    except:
+      dbg_exception()
+    return
+
+  
+  let no_progress = if dl.opts.show_progress or v_show_progress: 0 else: 1
+
+  let cr = curl_easy_request()
   opts cr:
     OPT_HTTPGET => 1
     OPT_WRITEDATA => addr file
     OPT_WRITEFUNCTION => curl_write_file
     OPT_FOLLOWLOCATION => 1
-    OPT_URL => url
+    OPT_URL => dl.url
     # OPT_VERBOSE => 1
     # OPT_PROGRESSFUNCTION => xfer
     OPT_NOPROGRESS => no_progress
-  cr.set_headers(headers)
-  dbg $cr.headerList.data
+  cr.set_headers(dl.headers)
   let ret = cr.run()
   file.close()
   cr.cleanup()
@@ -234,31 +402,8 @@ proc download(url, path: string, headers: seq[Header], no_progress = 1) =
   if ret != E_OK:
     raise newException(Exception, "download failed")
 
-proc `$`*(dl: Download): string =
-  let a = red "=>"
-  if v_np:
-    return &"{dl.url}"
-  let b = green dl.path
-  result = &"{dl.url}\n{a} {b}"
 
-proc `$$`(dl: Download): string =
- result = &"""{dl}
-    \n\toverwrite = {dl.opts.overwrite}
-  """
 
-const byteUnits = ['B', 'K', 'M', 'G', 'T', 'P', 'E']
-proc bytesToHR(byts: BiggestInt): string =
- var bytes = byts
- var i = 0
- while bytes > 1024:
-  bytes = bytes div 1024
-  i += 1
- $bytes & byteUnits[i]
-
-const
-  s_skipped = italic("Skipped")
-  s_downloaded = bold("Downloaded")
-  s_failed = "Failed".style(termRed & termNegative)
 
 proc download_base(dl: Download) =
   var path = dl.url.parseUrl.path
@@ -272,8 +417,7 @@ proc download_base(dl: Download) =
     return
 
   let st = cpuTime()
-  let no_progress = if dl.opts.show_progress: 0 else: 1
-  download(dl.url, dl.path, dl.headers, no_progress = no_progress)
+  dl.curl_download()
   dl.flags.time = round(cpuTime() - st, 3)
 
 proc makeDownload*(url, path: string, opts: Options, flags: Flags): Download =

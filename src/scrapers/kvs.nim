@@ -69,9 +69,7 @@ scraper "kvs":
     if v_url == "":
       err "no url provided"
       return
-    dbg "hello anyone here?"
     hpage parseUrl(v_url), "test":
-      dbg "after first request"
       header "referer", $v_url
       let scripts = data $$ ".player-holder script"
       let ss = $scripts[1]
@@ -81,7 +79,6 @@ scraper "kvs":
       rnd = "1626886807295"
       for m in ss.findIter r1:
         let video = m.captures.toSeq[0].get.parseUrl
-        dbg video.path
         var parts = video.path.split("/")
 
         var uhash = parts[3].decrypt_hash lc
@@ -89,8 +86,8 @@ scraper "kvs":
         video.path = parts.join("/").replace(re"\/$", "")
         # video.query["rnd"] = $rnd 
         let dl = makeDownload($video, getDlRoot() / "kvs" / video.path.extractFilename, true)
-        dl.opts.show_progress = true
         dl.headers = headers
         dl.download
+        break
       
       # echo videos

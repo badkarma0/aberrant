@@ -1,4 +1,4 @@
-# ARGS
+# parseopt wrapper
 import base, lag
 import termstyle, strformat, strutils, parseopt, algorithm, sequtils, sugar
 

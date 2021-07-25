@@ -1,87 +1,28 @@
-const
-  LEFT   = 0x01
-  RIGHT  = 0x02
-  UP     = 0x04
-  DOWN   = 0x08
-  H_DBL  = 0x10
-  V_DBL  = 0x20
 
-  HORIZ = LEFT or RIGHT
-  VERT  = UP or DOWN
+# var 
+#   f1 = open("x.txt", fmReadWrite)
+#   f2 = open("x.txt", fmReadWrite)
 
-var gBoxCharsUnicode: array[64, string]
+# f1.write("hello")
+# f1.flushFile()
 
-gBoxCharsUnicode[0] = " "
+# f2.setFilePos(20)
+# f2.write("xxxxx")
+# f2.setFilePos(0)
+# var b: seq[int8] = newSeq[int8](100)
+# echo f2.readBytes(b, 0 ,100)
+# echo b
 
-gBoxCharsUnicode[   0 or  0 or     0 or    0] = " "
-gBoxCharsUnicode[   0 or  0 or     0 or LEFT] = "─"
-gBoxCharsUnicode[   0 or  0 or RIGHT or    0] = "─"
-gBoxCharsUnicode[   0 or  0 or RIGHT or LEFT] = "─"
-gBoxCharsUnicode[   0 or UP or     0 or    0] = "│"
-gBoxCharsUnicode[   0 or UP or     0 or LEFT] = "┘"
-gBoxCharsUnicode[   0 or UP or RIGHT or    0] = "└"
-gBoxCharsUnicode[   0 or UP or RIGHT or LEFT] = "┴"
-gBoxCharsUnicode[DOWN or  0 or     0 or    0] = "│"
-gBoxCharsUnicode[DOWN or  0 or     0 or LEFT] = "┐"
-gBoxCharsUnicode[DOWN or  0 or RIGHT or    0] = "┌"
-gBoxCharsUnicode[DOWN or  0 or RIGHT or LEFT] = "┬"
-gBoxCharsUnicode[DOWN or UP or     0 or    0] = "│"
-gBoxCharsUnicode[DOWN or UP or     0 or LEFT] = "┤"
-gBoxCharsUnicode[DOWN or UP or RIGHT or    0] = "├"
-gBoxCharsUnicode[DOWN or UP or RIGHT or LEFT] = "┼"
+type
+  Xx = ref object
+    i: int
 
-gBoxCharsUnicode[H_DBL or    0 or  0 or     0 or    0] = " "
-gBoxCharsUnicode[H_DBL or    0 or  0 or     0 or LEFT] = "═"
-gBoxCharsUnicode[H_DBL or    0 or  0 or RIGHT or    0] = "═"
-gBoxCharsUnicode[H_DBL or    0 or  0 or RIGHT or LEFT] = "═"
-gBoxCharsUnicode[H_DBL or    0 or UP or     0 or    0] = "│"
-gBoxCharsUnicode[H_DBL or    0 or UP or     0 or LEFT] = "╛"
-gBoxCharsUnicode[H_DBL or    0 or UP or RIGHT or    0] = "╘"
-gBoxCharsUnicode[H_DBL or    0 or UP or RIGHT or LEFT] = "╧"
-gBoxCharsUnicode[H_DBL or DOWN or  0 or     0 or    0] = "│"
-gBoxCharsUnicode[H_DBL or DOWN or  0 or     0 or LEFT] = "╕"
-gBoxCharsUnicode[H_DBL or DOWN or  0 or RIGHT or    0] = "╒"
-gBoxCharsUnicode[H_DBL or DOWN or  0 or RIGHT or LEFT] = "╤"
-gBoxCharsUnicode[H_DBL or DOWN or UP or     0 or    0] = "│"
-gBoxCharsUnicode[H_DBL or DOWN or UP or     0 or LEFT] = "╡"
-gBoxCharsUnicode[H_DBL or DOWN or UP or RIGHT or    0] = "╞"
-gBoxCharsUnicode[H_DBL or DOWN or UP or RIGHT or LEFT] = "╪"
+var xs: seq[Xx]
+for i in 0..3:
+  var cx = new Xx
+  xs.add cx
+  echo cx.unsafeAddr.repr
 
-gBoxCharsUnicode[V_DBL or    0 or  0 or     0 or    0] = " "
-gBoxCharsUnicode[V_DBL or    0 or  0 or     0 or LEFT] = "─"
-gBoxCharsUnicode[V_DBL or    0 or  0 or RIGHT or    0] = "─"
-gBoxCharsUnicode[V_DBL or    0 or  0 or RIGHT or LEFT] = "─"
-gBoxCharsUnicode[V_DBL or    0 or UP or     0 or    0] = "║"
-gBoxCharsUnicode[V_DBL or    0 or UP or     0 or LEFT] = "╜"
-gBoxCharsUnicode[V_DBL or    0 or UP or RIGHT or    0] = "╙"
-gBoxCharsUnicode[V_DBL or    0 or UP or RIGHT or LEFT] = "╨"
-gBoxCharsUnicode[V_DBL or DOWN or  0 or     0 or    0] = "║"
-gBoxCharsUnicode[V_DBL or DOWN or  0 or     0 or LEFT] = "╖"
-gBoxCharsUnicode[V_DBL or DOWN or  0 or RIGHT or    0] = "╓"
-gBoxCharsUnicode[V_DBL or DOWN or  0 or RIGHT or LEFT] = "╥"
-gBoxCharsUnicode[V_DBL or DOWN or UP or     0 or    0] = "║"
-gBoxCharsUnicode[V_DBL or DOWN or UP or     0 or LEFT] = "╢"
-gBoxCharsUnicode[V_DBL or DOWN or UP or RIGHT or    0] = "╟"
-gBoxCharsUnicode[V_DBL or DOWN or UP or RIGHT or LEFT] = "╫"
-
-gBoxCharsUnicode[H_DBL or V_DBL or    0 or  0 or     0 or    0] = " "
-gBoxCharsUnicode[H_DBL or V_DBL or    0 or  0 or     0 or LEFT] = "═"
-gBoxCharsUnicode[H_DBL or V_DBL or    0 or  0 or RIGHT or    0] = "═"
-gBoxCharsUnicode[H_DBL or V_DBL or    0 or  0 or RIGHT or LEFT] = "═"
-gBoxCharsUnicode[H_DBL or V_DBL or    0 or UP or     0 or    0] = "║"
-gBoxCharsUnicode[H_DBL or V_DBL or    0 or UP or     0 or LEFT] = "╝"
-gBoxCharsUnicode[H_DBL or V_DBL or    0 or UP or RIGHT or    0] = "╚"
-gBoxCharsUnicode[H_DBL or V_DBL or    0 or UP or RIGHT or LEFT] = "╩"
-gBoxCharsUnicode[H_DBL or V_DBL or DOWN or  0 or     0 or    0] = "║"
-gBoxCharsUnicode[H_DBL or V_DBL or DOWN or  0 or     0 or LEFT] = "╗"
-gBoxCharsUnicode[H_DBL or V_DBL or DOWN or  0 or RIGHT or    0] = "╔"
-gBoxCharsUnicode[H_DBL or V_DBL or DOWN or  0 or RIGHT or LEFT] = "╦"
-gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or     0 or    0] = "║"
-gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or     0 or LEFT] = "╣"
-gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or RIGHT or    0] = "╠"
-gBoxCharsUnicode[H_DBL or V_DBL or DOWN or UP or RIGHT or LEFT] = "╬"
-
-
-const vs = [" ", "─", "─", "─", "│", "┘", "└", "┴", "│", "┐", "┌", "┬", "│", "┤", "├", "┼", " ", "═", "═", "═", "│", "╛", "╘", "╧", "│", "╕", "╒", "╤", "│", "╡", "╞", "╪", " ", "─", "─", "─", "║", "╜", "╙", "╨", "║", "╖", "╓", "╥", "║", "╢", "╟", "╫", " ", "═", "═", "═", "║", "╝", "╚", "╩", "║", "╗", "╔", "╦", "║", "╣", "╠", "╬"]
-
-assert vs == gBoxCharsUnicode
+for i in xs:
+  i.i = 20
+  echo i.unsafeAddr.repr
