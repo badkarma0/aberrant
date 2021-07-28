@@ -56,16 +56,18 @@ func decrypt_hash(hs,lc:string): string =
     k -= 1
   hash & tail
 
-let 
-  r1 = re"video.*?url.*?:.'function/0/(.*?)'"
-  r2 = re"(.*)\/.*?$"
-  r3 = re"rnd: '(.*?)'"
-  r4 = re"license_code: '(.*?)'"
+
 
 # works on all Kernel Video Sharing (KVS) CMS sites (maybe)
 scraper "kvs":
-  arg v_url, "arg1", req = true, help = "an url to a kvs site"
+  ra "arg1", req = true, help = "an url to a kvs site"
   exec:
+    let 
+      r1 = re"video.*?url.*?:.'function/0/(.*?)'"
+      r2 = re"(.*)\/.*?$"
+      r3 = re"rnd: '(.*?)'"
+      r4 = re"license_code: '(.*?)'"
+    var v_url = ga"arg1"
     if v_url == "":
       err "no url provided"
       return

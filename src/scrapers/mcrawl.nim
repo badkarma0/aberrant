@@ -158,18 +158,21 @@ proc crawl_worker {.thread.} =
 const s_max_default = "(default, 0 = infinity)"
 
 scraper "mcrawl":
-  arg v_start_url, "arg1", req = true, help = "an url"
+  ra "arg1", req = true, help = "an url"
   ra "brief", false, help = "less logging for downloads"
   ra "level", 2, help = "how many times to recurse into starting url"
   ra "pstyle", help = "path style: can be one of [compact/c, real/r]"
   ra "dregex"
   ra "cregex"
-  arg v_map, "map", false, help = "create a site map, no downloads"
+  ra "map", false, help = "create a site map, no downloads"
   ra "cm", 0, help = &"maximum links to crawl {s_max_default}"
   ra "cml", 0, help = "maximum links to crawl per level"
   ra "dm", 0, help = "maximum links to download"
   ra "dml", 0, help = "maximum links to download per level"
   exec:
+    var 
+      v_start_url = ga"arg1"
+      v_map = "map".ga false
     if v_start_url == "":
       if not xurl.empty:
         v_start_url = $xurl

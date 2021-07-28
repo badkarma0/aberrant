@@ -10,16 +10,19 @@ import ../screep/scraper
 
 const site = "http://cfake.com/"
 
-let 
-  r1 = re"thumbs"
-  r2 = re"about.([0-9]*).for"
-  r3 = re"picture/(.*?)/"
+
 
 
 scraper "cfake":
   match re(site & "picture")
-  arg v_name, "arg1", help="name of person", req = true
+  # ra "arg1", help="name of person", req = true
+  ra "arg1", help = "name of person", req = true
   exec:
+    let 
+      r1 = re"thumbs"
+      r2 = re"about.([0-9]*).for"
+      r3 = re"picture/(.*?)/"
+    var v_name = "arg1".ga
     var target = parseUrl("")
     if v_name == "":
       if not xurl.empty:

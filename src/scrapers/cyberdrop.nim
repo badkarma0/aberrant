@@ -4,14 +4,16 @@ import ../screep/scraper
 const
   top_url = "https://cdn.cyberdrop.me/hits/"
   base_url = "https://cyberdrop.me/"
-let
-  r1 = re"\/a\/(.*)$"
-  r2 = re"top"
+
 
 scraper "cyberdrop":
   match re"cyberdrop.me"
-  arg v_a1, "arg1", help = "url"
+  ra "arg1", help = "url"
   exec:
+    let
+      r1 = re"\/a\/(.*)$"
+      r2 = re"top"
+    var v_a1 = "arg1".ga
     if not xurl.empty: v_a1 = $xurl
 
     proc get_album(id: string) =

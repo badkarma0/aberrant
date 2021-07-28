@@ -1,28 +1,28 @@
 
-# var 
-#   f1 = open("x.txt", fmReadWrite)
-#   f2 = open("x.txt", fmReadWrite)
+import asyncdispatch, asynchttpserver, ws, os
+var connections = newSeq[WebSocket]()
+proc cb(req: asynchttpserver.Request) {.async, gcsafe.} =
+  if req.url.path == "/ws":
+    try:
+      var ws = await newWebSocket(req)
+      connections.add ws
+      await ws.send("Welcome to simple chat server")
+      while ws.readyState == Open:
+        let packet = await ws.receiveStrPacket()
+        echo "Received packet: " & packet
+        for other in connections:
+          if other.readyState == Open:
+            asyncCheck other.send(packet)
+    except WebSocketClosedError:
+      echo "Socket closed. "
+    except WebSocketProtocolMismatchError:
+      echo "Socket tried to use an unknown protocol: ", getCurrentExceptionMsg()
+    except WebSocketError:
+      echo "Unexpected socket error: ", getCurrentExceptionMsg()
+  await req.respond(Http200, "Hello World")
 
-# f1.write("hello")
-# f1.flushFile()
+var server = newAsyncHttpServer()
+asyncCheck server.serve(Port(9001), cb)
 
-# f2.setFilePos(20)
-# f2.write("xxxxx")
-# f2.setFilePos(0)
-# var b: seq[int8] = newSeq[int8](100)
-# echo f2.readBytes(b, 0 ,100)
-# echo b
-
-type
-  Xx = ref object
-    i: int
-
-var xs: seq[Xx]
-for i in 0..3:
-  var cx = new Xx
-  xs.add cx
-  echo cx.unsafeAddr.repr
-
-for i in xs:
-  i.i = 20
-  echo i.unsafeAddr.repr
+while true:
+  sleep 100

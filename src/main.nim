@@ -4,28 +4,26 @@ import strformat, strutils
 import scrapers/s_import
 import termstyle
 import times, options, urlly, nre
-import os
+import os, std.exitprocs
+import terminal, asyncdispatch
+import screep/scraper
+import screep/rpc
 from libcurl import version
 
-const version = "Aberrant v0.2.5"
+const version = "Aberrant v0.2.6"
 
 proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
-  for scraper in scrapers:
+  for scraper in scrapers.values:
     if scraper.name == name:
       return some(scraper)
 
 proc get_scraper_by_url(scrapers: Scrapers, url: string): Option[Scraper] =
-  for scraper in scrapers:
+  for scraper in scrapers.values:
     if scraper.rex.pattern == "": continue
     if url.find(scraper.rex).isSome:
       return some(scraper)
 
-proc run(scraper: Scraper, url = "") =
-  log &"Using Scraper: {scraper.name}"
-  let st = cpuTime()
-  scraper.srun(url.parseUrl)
-  let ft = cpuTime() - st
-  log &"Operation took {ft} seconds"
+
 
 proc run_by_url(url: string) =
   var maybe_scraper = scrapers.get_scraper_by_url(url)
@@ -39,7 +37,7 @@ proc run_by_url(url: string) =
 
 proc cleanup =
   exit_logger()
-
+  resetAttributes()
 
 proc main =
   ra "debug", false, help = "debug logging"
@@ -51,18 +49,23 @@ proc main =
   arg v_tui, "tui", false, help = &"use terminal user interface"
   arg v_file, "file", help = "read links from file"
   arg v_dl, "dl", help = "download a file"
+  arg v_daemon, "daemon", false, help = "run as a daemon"
   lt_do_debug = ga("debug", false)
   lt_do_verbose = ga("verbose", false)
   lt_do_trace = ga("trace", false)
 
   let a = red version
-  # echo &"=== [ {a} ] ==="
+
   if v_version:
     echo version
     echo libcurl.version()
     return
   if v_help:
-    print_help(&"some web scrapers\nur mom")
+    var help = ""
+    help &= "USAGE:" &
+    "\naberrant [SCRAPER_NAME] [SCRAPER_ARGS]" &
+    "\naberrant [URL]" 
+    print_help(&"=== [ {a} ] ===", help)
     return
 
   init_logger(v_tui)
@@ -70,9 +73,14 @@ proc main =
   #   exit_logger()
   #   return
 
+  if v_daemon:
+    "rpc".ezget.ezstart
+    "rpc".ezget.thread.joinThread()
+    log "dying"
+    return
+
   if v_dl != "":
     makeDownload(v_dl, v_dl.extractFilename, overwrite=true, show_progress = true).download
-    cleanup()
     return
 
   if v_file != "":
@@ -83,7 +91,6 @@ proc main =
   # dbg $pairs
   if v_arg0 == "":
     err &"Error scraper name or url required\n scraper can be one of {scrapers}"
-    cleanup()
     return
 
   var maybe_scraper = scrapers.get_scraper(v_arg0)
@@ -92,12 +99,11 @@ proc main =
       maybe_scraper.get.run()
     else:
       v_arg0.run_by_url()
-    cleanup()
   except:
     cleanup()
     echo "FATAL: " & $getCurrentException().name 
     echo getCurrentException().getStackTrace()
     echo getCurrentExceptionMsg()
 
-
+addExitProc(cleanup)
 main()

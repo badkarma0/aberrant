@@ -1,21 +1,23 @@
 import ../screep/scraper
 
 
-let
-  url_base = "https://www.pornhub.com/".parseUrl
-  video_url_base = url_base / "view_video.php"
-  r1 = re"(?x)""text"":.*?""(.*?)"".*?""url"":.*?""(.*?)"""
-  r2 = re"Showing (\d*)-(\d*) of (\d*)"
-  r_viewkey = re"(?<=\W|^)([0-9a-z]{15})(?=\W|$)"
-  r_model = re"(pornstar|model)\/(.*?)(?=\W|$)"
 
 # proc download_video(viewkey: string) =
   
 
 scraper "pornhub":
-  arg v_url, "arg1", req = true, help = "a string containing a viewkey, can be video url"
+  ra "arg1", req = true, help = "a string containing a viewkey, can be video url"
   exec:
     
+    let
+      url_base = "https://www.pornhub.com/".parseUrl
+      video_url_base = url_base / "view_video.php"
+      r1 = re"(?x)""text"":.*?""(.*?)"".*?""url"":.*?""(.*?)"""
+      r2 = re"Showing (\d*)-(\d*) of (\d*)"
+      r_viewkey = re"(?<=\W|^)([0-9a-z]{15})(?=\W|$)"
+      r_model = re"(pornstar|model)\/(.*?)(?=\W|$)"
+    var v_url = ga"arg1"
+
     proc download_video(viewkey: string) =
       let url = video_url_base
       url.query["viewkey"] = viewkey

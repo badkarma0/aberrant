@@ -1,11 +1,13 @@
 import base
 import strformat, termstyle, illwill_thread, sequtils, strutils
 import tables
+import nre, os
 # LOGGING
 
 type
+  LagWriteProc = proc(m:string) {.gcsafe.}
   CommandKind = enum
-    ckAddThead, ckDelThread
+    ckAddThead, ckDelThread, ckSetWriteProc
   MessageKind = enum
     mkMsg, mkCmd
   Message = ref object
@@ -17,7 +19,9 @@ type
       case cmd_kind: CommandKind
       of ckAddThead: add_thread: int
       of ckDelThread: del_thread: int
+      of ckSetWriteProc: write_proc: LagWriteProc
   Messages = seq[Message]
+
 var
   message_channel: Channel[Message]
   lt*: Thread[void]
@@ -27,6 +31,7 @@ var
   lt_show_thread* = true
   lt_exit = false
   lt_tui* = false
+  lt_write_proc: LagWriteProc = proc(m:string) = echo m
 
 
 proc `[]`(msgs: Messages, tid: int): Message =
@@ -43,71 +48,20 @@ proc update_or_add(msgs: var Messages, tid: int, msg: Message) =
     i += 1
   msgs.add msg
 
-
-proc log_worker() {.thread.} =
-  var 
-    iw: IllWill
-    tb: TerminalBuffer
-    thread_registry: seq[int]
-    last_messages: Table[int, Message]
-  if lt_tui:
-    iw = newIllWill()
-    iw.illwillInit(fullscreen=true)
-    # setControlCHook(exit_tui)
-    hideCursor()
-    tb = newTerminalBuffer(terminalWidth(), terminalHeight())
-  while true:
-    let tried = message_channel.tryRecv()
-    if not tried.dataAvailable:
-      if lt_exit:
-        if lt_tui:
-          iw.illwillDeinit()
-          showCursor()
-        break
-      continue
-    let message: Message = tried.msg
-    if lt_tui:
-      case message.kind:
-      of mkCmd:
-        case message.cmd_kind:
-        of ckAddThead:
-          thread_registry.add message.add_thread
-        of ckDelThread:
-          for i in 0..thread_registry.high - 1:
-            if thread_registry[i] == message.del_thread:
-              thread_registry.delete i
-        tb.clear()
-      of mkMsg:
-        tb.clear()
-        if not (message.tid in thread_registry):
-          break
-        last_messages[message.tid] = message
-        var i = 0
-        for msg in last_messages.values:
-          tb.write(0, i * 4, $msg.tid, "::", msg.content)
-          tb.drawHorizLine(0, terminalWidth() - 2, i * 4 + 3)
-          i += 1
-        iw.display(tb)
-    else:
-      if lt_show_thread:
-        echo &"[{message.tid}]{message.content}"
-      else:
-        echo message.content
-
 proc ln(n: string)=
   message_channel.send(Message(kind: mkMsg, tid: getThreadId(), content: n))
 
-template log*(msg: varargs[string, `$`]) =
+proc log*(msg: varargs[string, `$`]) =
   ln "[LOG] " & msg.join(" ")
 
-template err*(msg: varargs[string, `$`]) =
+proc err*(msg: varargs[string, `$`]) =
   ln "[ERR] ".red & msg.join(" ")
 
-template logv*(msg: varargs[string, `$`]) =
+proc logv*(msg: varargs[string, `$`]) =
   if lt_do_verbose:
     ln "[LOG] " & msg.join(" ")
 
-template dbg*(msgs: varargs[string, `$`]) =
+proc dbg*(msgs: varargs[string, `$`]) =
   if lt_do_debug:
     var msg = msgs.join(" ")
     if lt_do_trace:
@@ -122,16 +76,83 @@ template dbg_exception* =
   m &= getCurrentExceptionMsg() & "\n"
   dbg m
 
-template send_cmd(x_cmd_kind: CommandKind, key: untyped, value: untyped) =
+proc log_worker() {.thread.} =
+  var 
+    iw: IllWill
+    tb: TerminalBuffer
+    thread_registry: seq[int]
+    last_messages: Table[int, Message]
+    g_lt_write_proc: LagWriteProc
+  {.cast(gcsafe).}:
+    g_lt_write_proc = lt_write_proc
+  let
+    r_ascii = re"\e\[\d{1,2}m"
+  if lt_tui:
+    iw = newIllWill()
+    iw.illwillInit(fullscreen=true)
+    # setControlCHook(exit_tui)
+    hideCursor()
+    tb = newTerminalBuffer(terminalWidth(), terminalHeight())
+
+  while true:
+    let tried = message_channel.tryRecv()
+    if not tried.dataAvailable:
+      if lt_exit:
+        if lt_tui:
+          iw.illwillDeinit()
+          showCursor()
+        break
+      sleep 100
+      continue
+    let message: Message = tried.msg
+    if lt_tui:
+      case message.kind:
+      of mkCmd:
+        case message.cmd_kind:
+        of ckAddThead:
+          thread_registry.add message.add_thread
+        of ckDelThread:
+          for i in 0..thread_registry.high - 1:
+            if thread_registry[i] == message.del_thread:
+              thread_registry.delete i
+        of ckSetWriteProc:
+          discard
+        tb.clear()
+      of mkMsg:
+        tb.clear()
+        if not (message.tid in thread_registry):
+          break
+        last_messages[message.tid] = message
+        var i = 0
+        for msg in last_messages.values:
+          tb.write(0, i * 4, $msg.tid, "::", msg.content.replace(r_ascii, ""))
+          tb.drawHorizLine(0, terminalWidth() - 2, i * 4 + 3)
+          i += 1
+        iw.display(tb)
+    else:
+      if lt_show_thread:
+        echo &"[{message.tid}]{message.content}"
+        # g_lt_write_proc &"[{message.tid}]{message.content}"
+      else:
+        echo message.content
+        # g_lt_write_proc message.content
+
+
+
+template lag_cmd*(x_cmd_kind: CommandKind, key: untyped, value: untyped) =
   message_channel.send(Message(kind: mkCmd, cmd_kind: x_cmd_kind, key: value))
 
 proc lag_del_thread*(id = getThreadId()) =
   if lt_tui:
-    send_cmd ckDelThread, del_thread, id
+    lag_cmd ckDelThread, del_thread, id
 
 proc lag_add_thread*(id = getThreadId()) =
   if lt_tui:
-    send_cmd ckAddThead, add_thread, id
+    lag_cmd ckAddThead, add_thread, id
+
+proc lag_set_write_proc*(p: LagWriteProc) =
+  {.cast(gcsafe).}:
+    lt_write_proc = p
 
 # proc exit_tui {.noconv.} =
 #   illwillDeinit()

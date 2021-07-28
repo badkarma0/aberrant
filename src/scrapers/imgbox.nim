@@ -1,12 +1,14 @@
 import ../screep/scraper
 
-let 
-  r1 = re"g/(.*)"
-  base = "http://imgbox.com/g"
+const base = "http://imgbox.com/g"
+
 scraper "imgbox":
   match base.re
-  arg v_ar1, "arg1", help = "url"
+  ra "arg1", help = "url"
   exec:
+    let 
+      r1 = re"g/(.*)"
+    var v_ar1 = "arg1".ga
     if not xurl.empty: v_ar1 = $xurl
     rcase v_ar1:
       rof r1:

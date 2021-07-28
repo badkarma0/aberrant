@@ -5,8 +5,7 @@ import times
 const
   hash_posts = "ea4baf885b60cbf664b34ee760397549"
   base_url = "https://www.instagram.com"
-let
-  r1 = re"instagram.com\/(.*?)\/$"
+
 
 proc get_query_url(hash, vars: string): string =
   &"{base_url}/graphql/query/?query_hash={hash}&variables={vars}"
@@ -33,9 +32,12 @@ proc get_session(user, pass: string): Session =
   discard
 
 scraper "instagram":
-  arg v_ar1, "arg1"
+  ra "arg1"
   match re"instagram.com"
   exec:
+    let
+      r1 = re"instagram.com\/(.*?)\/$"
+    var v_ar1 = ga"arg1"
     if not xurl.empty: v_ar1 = $xurl
     rcase v_ar1:
       rof r1:

@@ -26,8 +26,9 @@ proc print(arg: Arg) =
 proc print_mod(s: string) =
   echo bold negative &"\n {s}"
 
-proc print_help*(desc: string) =
+proc print_help*(title,desc: string) =
   # echo box(&" {desc} ", '0', cc = termCyan & termNegative, sc = termNegative)
+  echo title
   echo ""
   for line in desc.split('\n'):
     echo &" {line}"
@@ -37,7 +38,7 @@ proc print_help*(desc: string) =
   for arg in r_args:
     if arg.smod == "":
       arg.print
-  for scraper in scrapers:
+  for scraper in scrapers.values:
     scraper.name.print_mod
     for arg in r_args:
       if arg.smod == scraper.name:

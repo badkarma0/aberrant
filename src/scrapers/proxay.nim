@@ -26,9 +26,12 @@ proc proxay_send*(msg: string) =
 
 
 scraper "proxay":
-  arg v_file, "arg1", req = true, help = "a file"
-  arg v_threads, "threads", def = 10, help = "number of threads"
+  ra "arg1", req = true, help = "a file"
+  ra "threads", def = 10, help = "number of threads"
   exec:
+    var 
+      v_file = ga"arg1"
+      v_threads = "threads".ga 10
     if not v_file.fileExists:
       err "file not found"
       return

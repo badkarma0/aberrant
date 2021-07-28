@@ -11,10 +11,14 @@ const api = "https://rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&limit=
 
 
 scraper "r34x":
-  arg v_tags, "arg1", help = "\"some tags\" or some+tags", req = true
-  arg v_max, "max", 100
-  arg v_full, "full", false
+  ra "arg1", help = "\"some tags\" or some+tags", req = true
+  ra "max", 100
+  ra "full", false
   exec:
+    var 
+      v_tags = ga"arg1"
+      v_max = "max".ga 100
+      v_full = "full".ga false
     v_tags = v_tags.replace(" ", "+")
     # let v_tags = ga("arg1").replace(" ", "+")
     # let v_max = ga("max", 100)

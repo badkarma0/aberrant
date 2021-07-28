@@ -6,8 +6,9 @@ import nre, times, urlly, os
 
 
 scraper "reddit":
-  arg v_url, "arg1", req = true, help = "a reddit url"
+  ra "arg1", req = true, help = "a reddit url"
   exec:
+    var v_url = ga"arg1"
     if v_url == "":
       err "url cant be empty"
       return

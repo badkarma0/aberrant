@@ -10,7 +10,7 @@ import urlly
 import nre, options, termstyle, strformat, strutils
 import http
 export base, xmltree, json, util, strformat, urlly, os, nre, strutils, termstyle
-
+import times
 const 
   root = "./aberrant/"
   s_crawling* = "Crawling".negative
@@ -99,6 +99,7 @@ template scraper*(id: string, body: untyped) =
     ra name, def, help, req, smod
     var `arg_name` {.inject.} = ga(name, def)
   template exec(exec_body: untyped) =
+
     proc get_dl_path(spath: string): string =
       return getDlRoot() / id / spath
     template pages(r1, r2: int, pages_body: untyped) =
@@ -124,23 +125,19 @@ template scraper*(id: string, body: untyped) =
         let data {.inject.} = fetchJson(url)
         block:
           jpage_body
-    scrapers.add Scraper(
+    scrapers[id] = Scraper(
       name: id, 
       rex: rex,
-      srun: proc (xurl {.inject.}: Url) =
+      srun: proc (xurl {.inject.}: Url) {.thread.} =
         block:
           exec_body
     )
   block:
     body
 
-import uri
-proc `/`*(urls: varargs[urlly.Url]): urlly.Url =
-  var base = parseUri("")
-  for url in urls:
-    base = base.combine(parseUri($url))
-  parseUrl($base)
-
-proc `/`*(url: urlly.Url, ext: string): urlly.Url =
-  url / parseUrl(ext)
-
+proc run*(scraper: Scraper, url = "") =
+  log &"Using Scraper: {scraper.name}"
+  let st = cpuTime()
+  scraper.srun(url.parseUrl)
+  let ft = cpuTime() - st
+  log &"Operation took {ft} seconds"
