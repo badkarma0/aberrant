@@ -76,7 +76,7 @@ proc main =
   if v_daemon:
     "rpc".ezget.ezstart
     "rpc".ezget.thread.joinThread()
-    log "dying"
+    echo "dying"
     return
 
   if v_dl != "":

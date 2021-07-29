@@ -22,6 +22,8 @@ type
       of ckSetWriteProc: write_proc: LagWriteProc
   Messages = seq[Message]
 
+proc p(m:string) = echo m
+
 var
   message_channel: Channel[Message]
   lt*: Thread[void]
@@ -31,8 +33,9 @@ var
   lt_show_thread* = true
   lt_exit = false
   lt_tui* = false
-  lt_write_proc: LagWriteProc = proc(m:string) = echo m
+  # lt_write_proc*: LagWriteProc = p
 
+# var lt_write_proc_p = lt_write_proc.addr
 
 proc `[]`(msgs: Messages, tid: int): Message =
   for i in 0..msgs.high - 1:
@@ -82,9 +85,7 @@ proc log_worker() {.thread.} =
     tb: TerminalBuffer
     thread_registry: seq[int]
     last_messages: Table[int, Message]
-    g_lt_write_proc: LagWriteProc
-  {.cast(gcsafe).}:
-    g_lt_write_proc = lt_write_proc
+    write_proc: LagWriteProc = proc(m:string) = echo m
   let
     r_ascii = re"\e\[\d{1,2}m"
   if lt_tui:
@@ -92,8 +93,7 @@ proc log_worker() {.thread.} =
     iw.illwillInit(fullscreen=true)
     # setControlCHook(exit_tui)
     hideCursor()
-    tb = newTerminalBuffer(terminalWidth(), terminalHeight())
-
+    tb = newTerminalBuffer(terminalWidth(), terminalHeight()) 
   while true:
     let tried = message_channel.tryRecv()
     if not tried.dataAvailable:
@@ -129,13 +129,20 @@ proc log_worker() {.thread.} =
           tb.drawHorizLine(0, terminalWidth() - 2, i * 4 + 3)
           i += 1
         iw.display(tb)
+    elif message.kind == mkCmd and message.cmd_kind == ckSetWriteProc:
+      echo "setting write proc"
+      write_proc = message.write_proc
+      echo "not crashed"
+
     else:
+      echo "a"
       if lt_show_thread:
-        echo &"[{message.tid}]{message.content}"
-        # g_lt_write_proc &"[{message.tid}]{message.content}"
+        # echo &"[{message.tid}]{message.content}"
+        write_proc(&"[{message.tid}]{message.content}")
       else:
-        echo message.content
-        # g_lt_write_proc message.content
+        # echo message.content
+        write_proc(message.content)
+      echo "b"
 
 
 
@@ -151,8 +158,7 @@ proc lag_add_thread*(id = getThreadId()) =
     lag_cmd ckAddThead, add_thread, id
 
 proc lag_set_write_proc*(p: LagWriteProc) =
-  {.cast(gcsafe).}:
-    lt_write_proc = p
+  lag_cmd ckSetWriteProc, write_proc, p
 
 # proc exit_tui {.noconv.} =
 #   illwillDeinit()

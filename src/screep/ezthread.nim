@@ -79,3 +79,9 @@ proc ezexit* =
 
 proc ezget*(thread_name: string): EZThread =
   ezt_registry[thread_name]
+
+
+type
+  VoidThreadProc = proc() {.thread.}
+proc spawn_void_thread*(p: VoidThreadProc): Thread[void] =
+  result.createThread p
