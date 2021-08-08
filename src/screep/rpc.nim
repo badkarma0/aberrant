@@ -22,17 +22,15 @@ in_channel.open()
 out_channel.open()
 
 
-proc unpack(s: string): ClientServerMsg =
-  s.parseJson.to ClientServerMsg
+proc unpack(s: string): ClientServerMsg = s.parseJson.to ClientServerMsg
 
-proc pack(s: ServerClientMsg): string =
-  $(%*s)
+proc pack(s: ServerClientMsg): string = $(%*s)
 
-func m(s:string, ws: WebSocket = nil): RPCMSG =
+func rpcmsg(s:string, ws: WebSocket = nil): RPCMSG =
   RPCMSG(msg:s,source:ws)
 
 proc write_out(m: string) =
-  out_channel.send(m.m)
+  out_channel.send(rpcmsg m)
 
 proc cb(req: asynchttpserver.Request) {.async, gcsafe.} =
   try:
@@ -41,7 +39,7 @@ proc cb(req: asynchttpserver.Request) {.async, gcsafe.} =
     asyncCheck ws.send ServerClientMsg(notif:"connected").pack
     while ws.readyState == Open:
       let packet = await ws.receiveStrPacket()
-      in_channel.send(m(packet, ws))
+      in_channel.send(rpcmsg(packet, ws))
   except:
     echo getCurrentExceptionMsg()
 
@@ -58,7 +56,6 @@ proc errp(err,id:string): string =
 proc rpc_worker() {.async.} =
   var e = false;
   var is_async = true;
-  echo "hi"
   ezloop in_channel, out_channel, e, is_async:
     ifin:
       echo "<= ", msgin.msg
@@ -68,13 +65,7 @@ proc rpc_worker() {.async.} =
       let id = msg.id.get
       proc result(s: string) =
         echo &"=> result {id} : {s}"
-        # asyncCheck msgin.source.send "result" 
-        # out_channel.send(m"retul2")
-        var r = ServerClientMsg(id:id, result:s).pack
-        # echo r
-        # echo connections[][msgin.source].repr
-        asyncCheck msgin.source.send r
-        # asyncCheck connections[][msgin.source].send "he"
+        asyncCheck msgin.source.send ServerClientMsg(id:id, result:s).pack
       if msg.exec.isSome:
         var exec = msg.exec.get
         if exec == "rpc_get_scrapers":

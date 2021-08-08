@@ -64,6 +64,7 @@ proc main =
     echo "Compiled at " & CompileDate & "/" & CompileTime
     echo libcurl.version()
     return
+  
   if v_help:
     var help = ""
     help &= "USAGE:" &
@@ -85,7 +86,6 @@ proc main =
   if v_daemon:
     start_rpc()
     runForever()
-    echo "exit daemon"
     return
 
   if v_dl != "":
@@ -114,5 +114,7 @@ proc main =
     echo getCurrentException().getStackTrace()
     echo getCurrentExceptionMsg()
 
-addExitProc(cleanup)
-main()
+
+when isMainModule:
+  addExitProc(cleanup)
+  main()
