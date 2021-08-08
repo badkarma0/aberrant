@@ -1,6 +1,7 @@
 import nre, urlly, options
 import tables
 export tables
+import os
 type
   KVPair* = ref object 
     key*, value*: string
@@ -10,6 +11,8 @@ type
     srun*: ScraperRun
     rex*: Regex
   Scrapers* = Table[string, Scraper]
+
+const version* = "Aberrant v0.2.6"
 
 var scrapers*: Scrapers
 
@@ -32,3 +35,6 @@ proc `/`*(urls: varargs[urlly.Url]): urlly.Url =
 proc `/`*(url: urlly.Url, ext: string): urlly.Url =
   url / parseUrl(ext)
 
+proc wait* =
+  while true:
+    sleep 1000

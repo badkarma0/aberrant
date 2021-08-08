@@ -5,6 +5,11 @@ type
   RPCMSG = ref object
     msg: string
     source: WebSocket
+  ClientServerMsg = ref object
+    exec,id,notif: Option[string]
+    params: Option[seq[string]]
+  ServerClientMsg = ref object
+    result,error,id,notif:string
 
 const ws_port = 8238
 
@@ -12,12 +17,16 @@ var
   in_channel: Channel[RPCMSG]
   out_channel: Channel[RPCMSG]
   connections: seq[WebSocket]
-
+  pcon = connections.addr
 in_channel.open()
 out_channel.open()
 
-var p_s = scrapers.unsafeAddr
-var p_connections = connections.unsafeAddr
+
+proc unpack(s: string): ClientServerMsg =
+  s.parseJson.to ClientServerMsg
+
+proc pack(s: ServerClientMsg): string =
+  $(%*s)
 
 func m(s:string, ws: WebSocket = nil): RPCMSG =
   RPCMSG(msg:s,source:ws)
@@ -28,44 +37,68 @@ proc write_out(m: string) =
 proc cb(req: asynchttpserver.Request) {.async, gcsafe.} =
   try:
     var ws = await newWebSocket(req)
-    p_connections[].add ws
+    pcon[].add ws
+    asyncCheck ws.send ServerClientMsg(notif:"connected").pack
     while ws.readyState == Open:
       let packet = await ws.receiveStrPacket()
       in_channel.send(m(packet, ws))
   except:
-    err getCurrentExceptionMsg()
+    echo getCurrentExceptionMsg()
 
-proc ws_worker() {.thread.} =
+proc ws_worker() {.async.} =
   var server = newAsyncHttpServer()
-  waitFor server.serve(Port(ws_port), cb)
+  await server.serve(Port(ws_port), cb)
 
-func packet(data: openArray[string]): JsonNode =
-  return
+proc errp(err,id:string): string =
+  var m: ServerClientMsg
+  m.error = err
+  m.id = id
+  m.pack
 
-proc rpc_worker(ezts: pointer) {.thread.} =
+proc rpc_worker() {.async.} =
+  var e = false;
+  var is_async = true;
+  echo "hi"
+  ezloop in_channel, out_channel, e, is_async:
+    ifin:
+      echo "<= ", msgin.msg
+      var msg = msgin.msg.unpack
+      if msg.id.isNone:
+        msg.id = "NOID".some
+      let id = msg.id.get
+      proc result(s: string) =
+        echo &"=> result {id} : {s}"
+        # asyncCheck msgin.source.send "result" 
+        # out_channel.send(m"retul2")
+        var r = ServerClientMsg(id:id, result:s).pack
+        # echo r
+        # echo connections[][msgin.source].repr
+        asyncCheck msgin.source.send r
+        # asyncCheck connections[][msgin.source].send "he"
+      if msg.exec.isSome:
+        var exec = msg.exec.get
+        if exec == "rpc_get_scrapers":
+          result $get_args_as_json()
+        elif scrapers.contains exec:
+          var scraper = scrapers[exec]
+          if msg.params.isSome and msg.params.get.high > -1: 
+            scraper.run(msg.params.get[0])
+          else:
+            scraper.run()
+        else:
+          err exec & " not found : " & id
+    ifout:
+      echo "=> ", msgout.msg
+      var msg = ServerClientMsg()
+      msg.notif = msgout.msg
+      var pmsg = msg.pack
+      for ws in connections:
+        if ws.readyState == Open:
+          asyncCheck ws.send pmsg
+
+proc start_rpc* =
   log &"~~~ INIT RPC THREAD on localhost:{ws_port} ~~~"
-  var ezt = cast[ptr EZThread](ezts)[]
-  var scrapers: Scrapers = p_s[]
-  echo "before set wp"
   lag_set_write_proc write_out
-  echo "still not crashed"
-  try:
-    ezloop in_channel, out_channel, ezt.exit:
-      ifin:
-        log "<=", msgin.msg
-        var c = msgin.msg.split(":")
-        if c[0] == "exec":
-          var scraper = scrapers[c[1]]
-          if scraper.isNil:
-            asyncCheck msgin.source.send("err:exec:" & c[1])
-          scraper.run(c[2])
-      ifout:
-        log "=>", msgout.msg
-  except:
-    dbg_exception()
-
-var rpc_ezt = EZThread()
-rpc_ezt.worker = rpc_worker
-"rpc".ezadd rpc_ezt
-
-discard ws_worker.spawn_void_thread
+  asyncCheck rpc_worker()
+  echo "dsadsadas"
+  asyncCheck ws_worker()

@@ -1,28 +1,20 @@
+import asyncdispatch
 
-import asyncdispatch, asynchttpserver, ws, os
-var connections = newSeq[WebSocket]()
-proc cb(req: asynchttpserver.Request) {.async, gcsafe.} =
-  if req.url.path == "/ws":
-    try:
-      var ws = await newWebSocket(req)
-      connections.add ws
-      await ws.send("Welcome to simple chat server")
-      while ws.readyState == Open:
-        let packet = await ws.receiveStrPacket()
-        echo "Received packet: " & packet
-        for other in connections:
-          if other.readyState == Open:
-            asyncCheck other.send(packet)
-    except WebSocketClosedError:
-      echo "Socket closed. "
-    except WebSocketProtocolMismatchError:
-      echo "Socket tried to use an unknown protocol: ", getCurrentExceptionMsg()
-    except WebSocketError:
-      echo "Unexpected socket error: ", getCurrentExceptionMsg()
-  await req.respond(Http200, "Hello World")
+proc the_end_of_time(m:string) {.async.} =
+  while true:
+    await sleepAsync(1000)
+    echo "loop " & m
 
-var server = newAsyncHttpServer()
-asyncCheck server.serve(Port(9001), cb)
+proc important1 {.async.} =
+  await the_end_of_time("1")
 
-while true:
-  sleep 100
+proc important2 {.async.} =
+  await the_end_of_time("2")
+
+proc run =
+  asyncCheck important1()
+  echo "this never gets echoed"
+  asyncCheck important2()
+
+run()
+runForever()

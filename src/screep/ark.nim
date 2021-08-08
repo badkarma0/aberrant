@@ -1,7 +1,7 @@
 # parseopt wrapper
 import base, lag
 import termstyle, strformat, strutils, parseopt, algorithm, sequtils, sugar
-
+import macros, json
 type
   Arg* = ref object
     name*: string
@@ -9,6 +9,7 @@ type
     kind*: string
     req*: bool
     smod*: string
+    def: string
   Args = seq[Arg]
 
 var r_args: Args
@@ -19,9 +20,9 @@ proc print(arg: Arg) =
     d = ""
   if arg.req:
     rs = "*"
-  # if not arg.def.isNil:
-  #   d = " (default: " & $arg.def & ")"
-  echo &"{arg.name}\t\t{rs}\t {arg.kind}\t\t{arg.help}{d}"
+  if arg.def != "":
+    d = arg.def
+  echo &"{arg.name}\t\t{rs}\t {arg.kind}\t\t{d}\t\t{arg.help}"
 
 proc print_mod(s: string) =
   echo bold negative &"\n {s}"
@@ -33,7 +34,7 @@ proc print_help*(title,desc: string) =
   for line in desc.split('\n'):
     echo &" {line}"
   echo ""
-  echo red bold &"name\t\trequired  type\t\t help"
+  echo red bold &"name\t\trequired  type\t\tdefault\t\t help"
   "global".print_mod
   for arg in r_args:
     if arg.smod == "":
@@ -43,6 +44,9 @@ proc print_help*(title,desc: string) =
     for arg in r_args:
       if arg.smod == scraper.name:
         arg.print
+
+proc get_args_as_json*: JsonNode =
+  %*r_args
 
 proc parse(): seq[KVPair] =
   var args: seq[KVPair] = @[]
@@ -102,11 +106,11 @@ proc ga*(name: string, def: float): float =
   loa name, def:
     return ar.value.parseFloat
 
-proc add_arg(name, kind, help, smod: string, req: bool) =
-  r_args.add Arg(name: name, help: help, kind: kind, req: req, smod: smod)
+proc add_arg(name, kind, help, smod: string, req: bool, def: string) =
+  r_args.add Arg(name: name, help: help, kind: kind, req: req, smod: smod, def: def)
 
 template ra*(name: string, def: typed = "", help = "", req = false, smod = "") =
-  add_arg name, $typeof(def), help, smod, req
+  add_arg name, $typeof(def), help, smod, req, $def
 
 template arg*(arg_name: untyped, name: string, def: typed = "", help = "", req = false, smod = "") =
   ra name, def, help, req, smod

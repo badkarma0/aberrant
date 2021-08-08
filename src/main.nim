@@ -8,9 +8,9 @@ import os, std.exitprocs
 import terminal, asyncdispatch
 import screep/scraper
 import screep/rpc
+# import gui/main
 from libcurl import version
 
-const version = "Aberrant v0.2.6"
 
 proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
   for scraper in scrapers.values:
@@ -22,8 +22,6 @@ proc get_scraper_by_url(scrapers: Scrapers, url: string): Option[Scraper] =
     if scraper.rex.pattern == "": continue
     if url.find(scraper.rex).isSome:
       return some(scraper)
-
-
 
 proc run_by_url(url: string) =
   var maybe_scraper = scrapers.get_scraper_by_url(url)
@@ -50,14 +48,20 @@ proc main =
   arg v_file, "file", help = "read links from file"
   arg v_dl, "dl", help = "download a file"
   arg v_daemon, "daemon", false, help = "run as a daemon"
+  arg v_gui, "gui", false, help = "run with a gui"
   lt_do_debug = ga("debug", false)
   lt_do_verbose = ga("verbose", false)
   lt_do_trace = ga("trace", false)
 
-  let a = red version
+  let a = red base.version
 
   if v_version:
-    echo version
+    when defined(release):
+      echo base.version & " (release)"
+    else:
+      echo base.version & " (debug)"
+    echo "Compiled with Nim v" & NimVersion
+    echo "Compiled at " & CompileDate & "/" & CompileTime
     echo libcurl.version()
     return
   if v_help:
@@ -73,10 +77,15 @@ proc main =
   #   exit_logger()
   #   return
 
+  if v_gui:
+    dbg "starting gui on main thread"
+    # start_gui()
+    return
+
   if v_daemon:
-    "rpc".ezget.ezstart
-    "rpc".ezget.thread.joinThread()
-    echo "dying"
+    start_rpc()
+    runForever()
+    echo "exit daemon"
     return
 
   if v_dl != "":

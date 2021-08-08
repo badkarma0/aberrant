@@ -1,5 +1,6 @@
 
 import tables, os
+import asyncdispatch
 
 type
   ThreadWorker = proc(eztp: pointer) {.thread.}
@@ -27,7 +28,7 @@ template ezloop*[T](channel: Channel[T], eval: untyped, lb: untyped) =
       lb
 
 
-template ezloop*[T](cin,cout: Channel[T], eval: untyped, lb: untyped) =
+template ezloop*[T](cin,cout: Channel[T], eval: untyped, is_async: untyped = false, lb: untyped,) =
   while true:
     let t_cin = cin.tryRecv()
     let t_cout = cout.tryRecv()
@@ -36,7 +37,8 @@ template ezloop*[T](cin,cout: Channel[T], eval: untyped, lb: untyped) =
         cin.close()
         cout.close()
         break
-      sleep 100
+      if is_async: await sleepAsync 100
+      else: sleep 100
       continue
     let msgin {.inject.}: T = t_cin.msg
     let msgout {.inject.}: T = t_cout.msg
@@ -83,5 +85,6 @@ proc ezget*(thread_name: string): EZThread =
 
 type
   VoidThreadProc = proc() {.thread.}
-proc spawn_void_thread*(p: VoidThreadProc): Thread[void] =
-  result.createThread p
+template spawn_void_thread*(p: VoidThreadProc) =
+  var t: Thread[void]
+  t.createThread p

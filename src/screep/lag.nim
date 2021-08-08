@@ -130,19 +130,17 @@ proc log_worker() {.thread.} =
           i += 1
         iw.display(tb)
     elif message.kind == mkCmd and message.cmd_kind == ckSetWriteProc:
-      echo "setting write proc"
+      # echo "setting write proc"
       write_proc = message.write_proc
-      echo "not crashed"
+      # echo "not crashed"
 
     else:
-      echo "a"
       if lt_show_thread:
         # echo &"[{message.tid}]{message.content}"
         write_proc(&"[{message.tid}]{message.content}")
       else:
         # echo message.content
         write_proc(message.content)
-      echo "b"
 
 
 
