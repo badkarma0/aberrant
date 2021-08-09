@@ -11,7 +11,6 @@ import screep/rpc
 # import gui/main
 from libcurl import version
 
-
 proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
   for scraper in scrapers.values:
     if scraper.name == name:
@@ -74,6 +73,7 @@ proc main =
     return
 
   init_logger(v_tui)
+  # lt_basic = true
   # if arg_starup_check():
   #   exit_logger()
   #   return
@@ -116,5 +116,6 @@ proc main =
 
 
 when isMainModule:
+  # setControlCHook()
   addExitProc(cleanup)
   main()

@@ -1,7 +1,8 @@
 import nre, urlly, options
-import tables
+import tables, strformat
 export tables
 import os
+import sparse
 type
   KVPair* = ref object 
     key*, value*: string
@@ -12,7 +13,16 @@ type
     rex*: Regex
   Scrapers* = Table[string, Scraper]
 
-const version* = "Aberrant v0.2.6"
+
+const version* = block:
+  var b = slurp("../../aberrant.nimble")
+  var i = 0
+  var t = b.next_token(i)
+  while "version" != t:
+    t = b.next_token(i)
+  discard b.next_token(i)
+  "Aberrant v" & b.next_token(i)[1..^2]
+
 
 var scrapers*: Scrapers
 

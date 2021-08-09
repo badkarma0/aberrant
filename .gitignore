@@ -2,3 +2,4 @@
 /build/
 abberant/
 /test
+/tests/*.exe

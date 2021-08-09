@@ -7,6 +7,25 @@
 
 import unittest
 
-import aberrantpkg/submodule
-test "correct welcome":
-  check getWelcomeMessage() == "Hello, World!"
+
+import os
+# proc w {.thread.} =
+#   while true:
+#     sleep 1000
+#     echo "..."
+#     break
+  
+# test "threads":
+#   var ts: array[10,Thread[void]]
+#   for i in 0..ts.high:
+#     ts[i].createThread w
+#   ts.joinThreads
+
+
+test "break":
+  while true:
+    if true:
+      echo "break"
+      break
+    sleep 1000
+

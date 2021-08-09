@@ -138,6 +138,9 @@ template scraper*(id: string, body: untyped) =
 proc run*(scraper: Scraper, url = "") =
   log &"Using Scraper: {scraper.name}"
   let st = cpuTime()
-  scraper.srun(url.parseUrl)
+  # var t:Thread[Url]
+  # t.createThread scraper.srun, url.parseUrl
+  # t.joinThread()
+  scraper.srun url.parseUrl
   let ft = cpuTime() - st
   log &"Operation took {ft} seconds"

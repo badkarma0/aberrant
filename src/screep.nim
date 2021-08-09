@@ -1,2 +1,2 @@
-import pkg/screep/scraper
+import screep/scraper
 export scraper

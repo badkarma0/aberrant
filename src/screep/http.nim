@@ -3,6 +3,8 @@ import ark, lag
 import libcurl, zippy
 import os, times, strformat, termstyle, urlly, math, strutils
 import httpclient
+import asyncdispatch
+import threadpool
 type
   Header* = object
     key*, value*: string
@@ -48,11 +50,14 @@ arg v_show_progress, "progress", false, help = "show progress"
 arg v_curl_verbose, "curl-verbose", false, help = "curl verbose"
 ra "chunk-size", "", help = "if chunked, chunk size"
 arg v_chunk_count, "chunk-count", 0, help = "if chunked, chunk count, overwrites chunk-size"
+arg v_sequential, "seq", false, help = "no threaded downloading"
 var
-  downloadChannel: Channel[Download]
+  download_channel: Channel[Download]
+  dls: seq[Download]
+  p_dls = dls.addr
   httpCclient = newHttpClient()
 
-downloadChannel.open()
+download_channel.open()
 const CRLF = "\r\n"
 
 func `[]`*(headers: seq[Header], key: string): string =
@@ -462,36 +467,51 @@ proc download*(url, path: string, overwrite = false, show_progress = false) =
 
 
 
-proc downloadFromChannel {.thread.} =
+proc download_worker {.thread.}=
   lag_add_thread()
   while true:
-    let tried = downloadChannel.tryRecv()
+    var tried = download_channel.tryRecv()
     if not tried.dataAvailable: 
       lag_del_thread()
       break
     let dl = tried.msg
     dl.download()
 
-proc download*(urls: openArray[string], path: string, headers: seq[Header]) =
+proc download*(urls: openArray[string], path: string, headers: seq[Header] = @[]) =
   if urls.len <= 0:
     return
-
-  var threads: array[10, Thread[void]]
-
+  
   path.createDir
 
-  for url in urls:
-    let p = url.parseUrl
-    let dl = makeDownload(url, path / p.path.extractFilename)
-    dl.headers = headers
-    downloadChannel.send(dl)
+  if not v_sequential:
 
-  for i in 0..threads.high:
-    createThread(threads[i], downloadFromChannel)
-  joinThreads(threads)
+    for url in urls:
+      let p = url.parseUrl
+      let dl = makeDownload(url, path / p.path.extractFilename)
+      dl.headers = headers
+      download_channel.send dl
 
-proc download*(urls: openArray[string], path: string) =
-  download(urls, path, @[])
+    # var threads: array[10, Thread[void]]
+    # for i in 0..threads.high:
+    #   createThread(threads[i], downloadFromChannel)
+    # joinThreads(threads)
+
+    # var futures: seq[Future[void]]
+    # for i in 0..10:
+    #   futures.add downloadFromChannel()
+    # for f in futures:
+    #   waitFor f
+
+    for i in 0..10:
+      spawn download_worker()
+    sync()
+  else:
+    for url in urls:
+      let p = url.parseUrl
+      let dl = makeDownload(url, path / p.path.extractFilename)
+      dl.headers = headers
+      dl.download
+
 
 when isMainModule:
   const

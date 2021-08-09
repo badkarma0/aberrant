@@ -22,7 +22,6 @@ type
       of ckSetWriteProc: write_proc: LagWriteProc
   Messages = seq[Message]
 
-proc p(m:string) = echo m
 
 var
   message_channel: Channel[Message]
@@ -33,6 +32,7 @@ var
   lt_show_thread* = true
   lt_exit = false
   lt_tui* = false
+  lt_basic* = false
   # lt_write_proc*: LagWriteProc = p
 
 # var lt_write_proc_p = lt_write_proc.addr
@@ -51,8 +51,11 @@ proc update_or_add(msgs: var Messages, tid: int, msg: Message) =
     i += 1
   msgs.add msg
 
-proc ln(n: string)=
-  message_channel.send(Message(kind: mkMsg, tid: getThreadId(), content: n))
+proc ln(n: string) =
+  if lt_basic:
+    echo n
+  else:
+    message_channel.send(Message(kind: mkMsg, tid: getThreadId(), content: n))
 
 proc log*(msg: varargs[string, `$`]) =
   ln "[LOG] " & msg.join(" ")
