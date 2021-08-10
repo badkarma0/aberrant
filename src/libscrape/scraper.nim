@@ -1,15 +1,15 @@
-import util
 import base
-import urlly
 import os
 import htmlparser
 import xmltree
 import nimquery
 import json
-import urlly
 import nre, options, termstyle, strformat, strutils
 import http
-export base, xmltree, json, util, strformat, urlly, os, nre, strutils, termstyle
+export base, xmltree, json, strformat, os, nre, strutils, termstyle
+import ark, lag, http, base, proxay, ezthread, url
+export ark, lag, http, base, proxay, ezthread, url
+
 import times
 const 
   root = "./aberrant/"
@@ -22,11 +22,18 @@ let
 # arg v_path, "out", root, help = &"output root directory, default: {root}"
 
 
-proc getRoot*: string =
+proc `/=`*(p1: var string, p2: string) =
+  # append something to a path, short for "p1 = p1 / p2"
+  p1 = p1 / p2
+
+proc empty*(url: Url): bool =
+  $url == ""
+
+proc get_root*: string =
   return root
 
-proc getDlRoot*: string =
-  return getRoot() / "downloads"
+proc get_dl_root*: string =
+  return get_root() / "downloads"
 
 proc `$`*(node: XmlNode, q: string): XmlNode =
   result = node.querySelector(q)
@@ -34,7 +41,7 @@ proc `$`*(node: XmlNode, q: string): XmlNode =
 proc `$$`*(node: XmlNode, q: string): seq[XmlNode] =
   result = node.querySelectorAll(q)
 
-proc fetchHtml*(url: Url): XmlNode =
+proc fetch_html*(url: Url): XmlNode =
   let res = fetch($url)
   let node = parseHtml(res)
   if $node == "<document />":
@@ -42,7 +49,7 @@ proc fetchHtml*(url: Url): XmlNode =
   else:
     return node
 
-proc fetchJson*(url: Url, s: Session = new Session): JsonNode =
+proc fetch_json*(url: Url, s: Session = new Session): JsonNode =
   let res = fetch($url)
   try:
     dbg res[0..500]
@@ -65,7 +72,7 @@ proc fetchJson*(url: Url, s: Session = new Session): JsonNode =
 #     headers[name] = val
 #   block:
 #     page_body
-#   urls.download getDlRoot() / id / spath, headers
+#   urls.download get_dl_root() / id / spath, headers
 
 # template hpage*(url: Url, id, spath: string, hpage_body: untyped) =
 #   page id, spath:
@@ -101,7 +108,7 @@ template scraper*(id: string, body: untyped) =
   template exec(exec_body: untyped) =
 
     proc get_dl_path(spath: string): string =
-      return getDlRoot() / id / spath
+      return get_dl_root() / id / spath
     template pages(r1, r2: int, pages_body: untyped) =
       for i {.inject.} in r1..r2:
         log &"{s_crawling} page " & $i
@@ -114,7 +121,7 @@ template scraper*(id: string, body: untyped) =
         headers[name] = val
       block:
         page_body
-      urls.download getDlRoot() / id / spath, headers
+      urls.download get_dl_root() / id / spath, headers
     template hpage(url: Url, spath: string, hpage_body: untyped) =
       page spath:
         let data {.inject.} = fetchHtml(url)

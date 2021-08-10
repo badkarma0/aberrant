@@ -1,17 +1,10 @@
-import nre
 import strutils
 import math
 import xmltree
-import urlly
-import os
 import strformat
-import ../screep/util
-import ../screep/scraper
+import ../libscrape
 
 const site = "http://cfake.com/"
-
-
-
 
 scraper "cfake":
   match re(site & "picture")
@@ -28,7 +21,7 @@ scraper "cfake":
       if not xurl.empty:
         let match = ($xurl).find r3
         target = xurl
-        v_name = match.get.captures.toSeq[0].get
+        v_name = match.get.captures[0]
       else:
         err "name can not be empty"
         return
@@ -49,7 +42,7 @@ scraper "cfake":
 
     var total = 0
     if match.isSome:
-      total = match.get.captures.toSeq[0].get.parseInt
+      total = match.get.captures[0].parseInt
     if total == 0:
       err &"found no images"
       return    

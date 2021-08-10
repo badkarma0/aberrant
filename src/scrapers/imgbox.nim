@@ -1,4 +1,4 @@
-import ../screep/scraper
+import ../libscrape
 
 const base = "http://imgbox.com/g"
 

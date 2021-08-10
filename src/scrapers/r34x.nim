@@ -1,11 +1,6 @@
 
-import ../screep/util
-import ../screep/base
-import ../screep/scraper
-import urlly
-import json
-import strformat
-import strutils
+
+import ../libscrape
 
 const api = "https://rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&limit=100"
 

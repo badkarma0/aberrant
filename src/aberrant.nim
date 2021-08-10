@@ -1,13 +1,12 @@
-import screep/base
-import screep/util
 import strformat, strutils
 import scrapers/s_import
 import termstyle
 import times, options, urlly, nre
 import os, std.exitprocs
 import terminal, asyncdispatch
-import screep/scraper
-import screep/rpc
+import libscrape/rpc
+import libscrape/base
+import libscrape
 # import gui/main
 from libcurl import version
 

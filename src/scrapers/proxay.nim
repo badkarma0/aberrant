@@ -1,6 +1,6 @@
 
 
-import ../screep/scraper
+import ../libscrape
 
 var
   r_ip_port = re"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}"

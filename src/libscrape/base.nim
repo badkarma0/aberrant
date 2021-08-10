@@ -1,8 +1,9 @@
-import nre, urlly, options
+import nre, options
 import tables, strformat
 export tables
 import os
 import sparse
+import url
 type
   KVPair* = ref object 
     key*, value*: string
@@ -35,15 +36,6 @@ proc `$`*(sc: Scrapers): string =
     result &= $s & ", "
   result = result[0..^3] & "]"
 
-import uri
-proc `/`*(urls: varargs[urlly.Url]): urlly.Url =
-  var base = parseUri("")
-  for url in urls:
-    base = base.combine(parseUri($url))
-  parseUrl($base)
-
-proc `/`*(url: urlly.Url, ext: string): urlly.Url =
-  url / parseUrl(ext)
 
 proc wait* =
   while true:

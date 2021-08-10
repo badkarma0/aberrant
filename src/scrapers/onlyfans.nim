@@ -1,6 +1,6 @@
 
 
-import ../screep/scraper
+import ../libscrape
 
 
 scraper "onlyfans":

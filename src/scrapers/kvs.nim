@@ -1,7 +1,6 @@
 
-import ../screep/util
-import ../screep/scraper
-import nre, times, urlly, os, math
+import ../libscrape
+import math
 
 const hash_range = 16
 func calc_seed(lc: string):string =
@@ -76,18 +75,18 @@ scraper "kvs":
       let scripts = data $$ ".player-holder script"
       let ss = $scripts[1]
       var videos: seq[Url]
-      var rnd = ss.find(r3).get.captures.toSeq[0].get
-      var lc = ss.find(r4).get.captures.toSeq[0].get
+      var rnd = ss.find(r3).get.captures[0]
+      var lc = ss.find(r4).get.captures[0]
       rnd = "1626886807295"
       for m in ss.findIter r1:
-        let video = m.captures.toSeq[0].get.parseUrl
+        let video = m.captures[0].parseUrl
         var parts = video.path.split("/")
 
         var uhash = parts[3].decrypt_hash lc
         parts[3] = uhash
         video.path = parts.join("/").replace(re"\/$", "")
         # video.query["rnd"] = $rnd 
-        let dl = makeDownload($video, getDlRoot() / "kvs" / video.path.extractFilename, true)
+        let dl = make_download($video, getDlRoot() / "kvs" / video.path.extractFilename, true)
         dl.headers = headers
         dl.download
         break

@@ -1,5 +1,5 @@
 
-import ../screep/scraper
+import ../libscrape
 
 const
   top_url = "https://cdn.cyberdrop.me/hits/"

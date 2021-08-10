@@ -1,5 +1,5 @@
 
-import ../screep/scraper
+import ../libscrape
 import times
 
 const

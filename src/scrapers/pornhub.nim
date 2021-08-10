@@ -1,6 +1,4 @@
-import ../screep/scraper
-
-
+import ../libscrape
 
 # proc download_video(viewkey: string) =
   
@@ -34,7 +32,7 @@ scraper "pornhub":
             p_video = video
         log &"{s_found} video: {p_size} :: {p_video}"
         if p_video != "":
-          download makeDownload(p_video, getDlRoot() / "pornhub" / viewkey & ".mp4")
+          download make_download(p_video, getDlRoot() / "pornhub" / viewkey & ".mp4")
 
     proc download_model(kind_model: string) =
       var

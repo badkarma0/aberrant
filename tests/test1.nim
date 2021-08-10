@@ -29,3 +29,9 @@ test "break":
       break
     sleep 1000
 
+test "case":
+  proc hello =
+    echo "hello"
+  # proc h_e_l_l_o =
+  #   echo "hello"
+  he_ll_o()

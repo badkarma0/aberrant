@@ -1,9 +1,6 @@
 
 
-import ../screep/scraper
-import nre, times, urlly, os
-
-
+import ../libscrape
 
 scraper "reddit":
   ra "arg1", req = true, help = "a reddit url"

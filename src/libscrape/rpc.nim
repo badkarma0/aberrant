@@ -88,8 +88,7 @@ proc rpc_worker() {.async.} =
           asyncCheck ws.send pmsg
 
 proc start_rpc* =
-  log &"~~~ INIT RPC THREAD on localhost:{ws_port} ~~~"
+  log &"~~~ INIT RPC on localhost:{ws_port} ~~~"
   lag_set_write_proc write_out
   asyncCheck rpc_worker()
-  echo "dsadsadas"
   asyncCheck ws_worker()

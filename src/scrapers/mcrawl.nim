@@ -1,6 +1,4 @@
-import ../screep/scraper
-import ../screep/jsonfs
-import termstyle
+import ../libscrape
 
 type
   Target = ref object
@@ -152,7 +150,7 @@ proc crawl_worker {.thread.} =
         path /= downl_url.hostname / downl_url.path.extractFilename
 
 
-      let dl = makeDownload($downl_url, path)
+      let dl = make_download($downl_url, path)
       dl.download
 
 const s_max_default = "(default, 0 = infinity)"

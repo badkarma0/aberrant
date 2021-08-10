@@ -1,4 +1,4 @@
-import ../screep
+import ../libscrape
 
 import threadpool
 

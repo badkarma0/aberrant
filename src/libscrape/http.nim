@@ -136,6 +136,13 @@ const
   s_downloaded = bold("Downloaded")
   s_failed = "Failed".style(termRed & termNegative)
 
+# ----------------------------------------------------------------
+# curl stuff
+# ----------------------------------------------------------------
+
+type
+  HttpException = ref object of CatchableError
+  CurlFileWriteFailed = ref object of HttpException
 
 proc curl_write_file(
   buffer: cstring,
@@ -146,8 +153,8 @@ proc curl_write_file(
   let outbuf = cast[ptr File](outstream)
   let wsize = outbuf[].writeBuffer(buffer, count)
   if wsize != count:
-    raise newException(Exception, &"fucking died lmao, file write {wsize}, {count}")
-  result = size * count
+    raise CurlFileWriteFailed()
+  size * count
 
 proc curl_write_file_chunked(
   buffer: cstring,
@@ -158,10 +165,9 @@ proc curl_write_file_chunked(
   let crange = cast[ptr CurlRange](outstream)[]
   crange.file.setFilePos crange.cur
   let wsize = crange.file.writeBuffer(buffer, count)
-  # crange.total = 1
   crange.file.flushFile()
   if wsize != count:
-    raise newException(Exception, &"fucking died lmao, file write {wsize}, {count}")
+    raise CurlFileWriteFailed()
   crange.cur += wsize 
   size * count
 
@@ -172,7 +178,7 @@ proc curl_write_gen(
   outstream: pointer
 ): int =
   if size != 1:
-    raise newException(Exception, &"fucking died lmao, gen write {count}")
+    raise CurlFileWriteFailed()
   let 
     outbuf = cast[ref string](outstream)
     i = outbuf[].len
@@ -203,6 +209,7 @@ proc curl_easy_request: CurlRequest  =
   opt cr, OPT_WRITEFUNCTION, curl_write_gen
   opt cr, OPT_HEADERFUNCTION, curl_write_gen
   opt cr, OPT_USERAGENT, "Aberrant (curl)"
+  opt cr, OPT_ACCEPT_ENCODING, ""
   if v_curl_verbose:
     opt cr, OPT_VERBOSE, 1
   when defined(windows):
@@ -217,7 +224,6 @@ proc set_headers(cr: CurlRequest, hs: seq[Header]) =
   for h in hs:
     cr.headerList = cr.headerList.slist_append(h.key & ": " & h.value)
   opt cr, OPT_HTTPHEADER, cr.headerList
-  
 
 proc get_headers(cr: CurlRequest): seq[Header] =
   for line in cr.headerData[].split(CRLF):
@@ -226,7 +232,6 @@ proc get_headers(cr: CurlRequest): seq[Header] =
       result[arr[0].strip()] = arr[1].strip()
 proc get_body(cr: CurlRequest): string =
   cr.bodyData[]
-
 
 proc cleanup(cr: CurlRequest) =
   cr.curl.easy_cleanup()
@@ -279,6 +284,7 @@ proc head*(req: Request): seq[Header] =
     OPT_FOLLOWLOCATION => 1
   cr.set_headers req.headers
   discard cr.run()
+  cr.cleanup()
   cr.get_headers()
 
 proc fetch*(url: string, verb = "get", headers = newSeq[Header]()): string =
@@ -374,9 +380,7 @@ proc curl_download*(dl: Download) =
   var file = open(dl.path, fmWrite)
 
   if file == nil:
-    raise newException(IOError, "file is nil")
-
-  
+    raise newException(IOError, &"Failed to open file {dl.url}")
 
   if dl.opts.chunked or v_chunked:
     file.close()
@@ -385,7 +389,6 @@ proc curl_download*(dl: Download) =
     except:
       dbg_exception()
     return
-
   
   let no_progress = if dl.opts.show_progress or v_show_progress: 0 else: 1
 
@@ -407,8 +410,9 @@ proc curl_download*(dl: Download) =
   if ret != E_OK:
     raise newException(Exception, "download failed")
 
-
-
+# ------------------------------------------------------
+# public download/request api
+# ------------------------------------------------------
 
 proc download_base(dl: Download) =
   var path = dl.url.parseUrl.path
@@ -425,7 +429,7 @@ proc download_base(dl: Download) =
   dl.curl_download()
   dl.flags.time = round(cpuTime() - st, 3)
 
-proc makeDownload*(url, path: string, opts: Options, flags: Flags): Download =
+proc make_download*(url, path: string, opts: Options, flags: Flags): Download =
   result = Download(
     url: url,
     path: path,
@@ -433,8 +437,8 @@ proc makeDownload*(url, path: string, opts: Options, flags: Flags): Download =
     flags: flags
   )
 
-proc makeDownload*(url, path = "", overwrite = false, show_progress = false): Download =
-  result = makeDownload(
+proc make_download*(url, path = "", overwrite = false, show_progress = false): Download =
+  result = make_download(
     url, path, Options(
       overwrite: overwrite,
       show_progress: show_progress
@@ -443,9 +447,6 @@ proc makeDownload*(url, path = "", overwrite = false, show_progress = false): Do
       skipped: false
     )
   )
-
-# proc makeDownload*(url, path = ""): Download =
- # return makeDownload(url, path, default(Options))
 
 proc download*(dl: Download) =
  try:
@@ -463,11 +464,9 @@ proc download*(dl: Download) =
   err &"{s_failed}: {dl}"
 
 proc download*(url, path: string, overwrite = false, show_progress = false) =
- download makeDownload(url, path, overwrite, show_progress)
+ download make_download(url, path, overwrite, show_progress)
 
-
-
-proc download_worker {.thread.}=
+proc download_worker {.thread.} =
   lag_add_thread()
   while true:
     var tried = download_channel.tryRecv()
@@ -487,20 +486,9 @@ proc download*(urls: openArray[string], path: string, headers: seq[Header] = @[]
 
     for url in urls:
       let p = url.parseUrl
-      let dl = makeDownload(url, path / p.path.extractFilename)
+      let dl = make_download(url, path / p.path.extractFilename)
       dl.headers = headers
       download_channel.send dl
-
-    # var threads: array[10, Thread[void]]
-    # for i in 0..threads.high:
-    #   createThread(threads[i], downloadFromChannel)
-    # joinThreads(threads)
-
-    # var futures: seq[Future[void]]
-    # for i in 0..10:
-    #   futures.add downloadFromChannel()
-    # for f in futures:
-    #   waitFor f
 
     for i in 0..10:
       spawn download_worker()
@@ -508,7 +496,7 @@ proc download*(urls: openArray[string], path: string, headers: seq[Header] = @[]
   else:
     for url in urls:
       let p = url.parseUrl
-      let dl = makeDownload(url, path / p.path.extractFilename)
+      let dl = make_download(url, path / p.path.extractFilename)
       dl.headers = headers
       dl.download
 
