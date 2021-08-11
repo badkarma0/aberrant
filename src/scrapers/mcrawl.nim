@@ -1,4 +1,5 @@
 import ../libscrape
+import xmltree
 
 type
   Target = ref object
@@ -72,18 +73,19 @@ proc check_if_path_exists(path: string): bool =
     else:
       jfs_out_channel.send request
 
-proc crawl_worker {.thread.} =
+proc crawl_worker(args: ArgStore) {.thread.} =
   let
-    v_brief = "brief".ga false 
-    v_level = "level".ga 2 
-    v_map = "map".ga false 
-    v_path_style = "pstyle".ga 
-    v_crawl_regex = "cregex".ga.re  
-    v_downl_regex = "dregex".ga.re
-    v_cm = "cm".ga 0
-    v_dm = "dm".ga 0
-    v_cml = "cml".ga 0
-    v_dml = "dml".ga 0
+    v_brief = args.get("brief", false) 
+    v_level = args.get("level", 2) 
+    v_map = args.get("map", false) 
+    v_path_style = args.get("pstyle")
+    v_crawl_regex = args.get("cregex").re 
+    v_downl_regex = args.get("dregex").re
+    v_cm = args.get("cm", 0)
+    v_dm = args.get("dm", 0)
+    v_cml = args.get("cml", 0)
+    v_dml = args.get("dml", 0)
+    v_autoref = args.get("autoref", true)
   lag_add_thread()
   while true:
     let item = crawl_channel.tryRecv()
@@ -94,7 +96,7 @@ proc crawl_worker {.thread.} =
         return
       continue
     let target = item.msg
-    let url = target.url
+    let url: Url = target.url
 
     if not ($url).contains v_crawl_regex: continue
     let ss = negative &"[LVL:{target.level}|ID:{target.id}/{target_gid}]"
@@ -106,15 +108,16 @@ proc crawl_worker {.thread.} =
     var crawl_counter = 0
     try:
       let data = fetchHtml(url)
+      # dbg data.rawText[0..200]
       for elem in data $$ "img, video, source":
-        let d_url = url / elem.attr("src")
+        let d_url = url.combine elem.attr("src").parseUrl
         if check_if_path_exists(d_url.hostname & d_url.path):
           # dbg &"{s_skipping} {d_url}"
           continue
         # dbg "found new" & $d_url
         downl_urls.add(d_url)
         total_downloads += 1
-        if total_downloads >= v_dm: break
+        if v_dm != 0 and total_downloads >= v_dm: break
       for elem in data $$ "a":
         let c_url = url / elem.attr("href")
         if check_if_path_exists(c_url.hostname & c_url.path): 
@@ -149,11 +152,10 @@ proc crawl_worker {.thread.} =
       of "":
         path /= downl_url.hostname / downl_url.path.extractFilename
 
-
       let dl = make_download($downl_url, path)
+      if v_autoref:
+        dl.headers["referer"] = $url
       dl.download
-
-const s_max_default = "(default, 0 = infinity)"
 
 scraper "mcrawl":
   ra "arg1", req = true, help = "an url"
@@ -163,35 +165,35 @@ scraper "mcrawl":
   ra "dregex"
   ra "cregex"
   ra "map", false, help = "create a site map, no downloads"
-  ra "cm", 0, help = &"maximum links to crawl {s_max_default}"
+  ra "cm", 0, help = &"maximum links to crawl"
   ra "cml", 0, help = "maximum links to crawl per level"
   ra "dm", 0, help = "maximum links to download"
   ra "dml", 0, help = "maximum links to download per level"
   exec:
     var 
-      v_start_url = ga"arg1"
-      v_map = "map".ga false
-    if v_start_url == "":
+      v_start_url = args.get("arg1").parseUrl
+      v_map = args.get("map", false)
+    if v_start_url.empty:
       if not xurl.empty:
-        v_start_url = $xurl
+        v_start_url = xurl
       else: 
         err "please provide an url"
         return
     
-    crawl_channel.send parseUrl(v_start_url).makeTarget
+    crawl_channel.send v_start_url.makeTarget
 
     var jfs_thread: Thread[void]
     jfs_thread.createThread jfs_worker
 
     const v_threads = 10
-    var threads: array[v_threads, Thread[void]]
+    var threads: array[v_threads, Thread[ArgStore]]
     for i in 0..v_threads-1:
-      threads[i].createThread crawl_worker
+      threads[i].createThread crawl_worker, args
     
     joinThreads(threads)
 
     if v_map:
-      let map_path = getRoot() / "mcrawl_maps" / parseUrl(v_start_url).hostname & ".json"
+      let map_path = getRoot() / "mcrawl_maps" / v_start_url.hostname & ".json"
       map_path.parentDir.createDir
       jfs_in_channel.send(JFSRequest(id: getThreadId(), path: "write:" & map_path))
 

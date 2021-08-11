@@ -8,7 +8,7 @@
 import unittest
 
 
-import os
+import os, ../src/libscrape
 # proc w {.thread.} =
 #   while true:
 #     sleep 1000
@@ -35,3 +35,13 @@ test "case":
   # proc h_e_l_l_o =
   #   echo "hello"
   he_ll_o()
+
+test "url combine":
+  var u1 = parseUrl "https://famousinternetgirls.com/video/dejatualma-wine-bottle-pussy-fuck-onlyfans-leaked-videos/"
+  var u2 = parseUrl "https://famousinternetgirls.com/wp-content/themes/videotube/img/logo.png"
+  echo u1.combine u2
+
+test "json string":
+  echo "1000".parseJson.to int
+  echo "\"1000\"".parseJson.to string
+  echo "1000".parseJson.to string

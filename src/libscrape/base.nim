@@ -4,10 +4,11 @@ export tables
 import os
 import sparse
 import url
+import ark
 type
   KVPair* = ref object 
     key*, value*: string
-  ScraperRun* = proc (url: Url) {.thread.}
+  ScraperRun* = proc (url: Url, args: ArgStore = gArgStore) {.thread.}
   Scraper* = ref object
     name*: string
     srun*: ScraperRun
@@ -26,6 +27,8 @@ const version* = block:
 
 
 var scrapers*: Scrapers
+
+
 
 proc `$`*(s: Scraper): string =
   s.name

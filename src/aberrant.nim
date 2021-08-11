@@ -68,7 +68,10 @@ proc main =
     help &= "USAGE:" &
     "\naberrant [SCRAPER_NAME] [SCRAPER_ARGS]" &
     "\naberrant [URL]" 
-    print_help(&"=== [ {a} ] ===", help)
+    var cats: seq[string]
+    for k in scrapers.keys:
+      cats.add k
+    print_help(cats, &"=== [ {a} ] ===", help)
     return
 
   init_logger(v_tui)

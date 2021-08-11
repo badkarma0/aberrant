@@ -19,6 +19,10 @@ type
     hostname*, port*, path*, fragment*: string
     query*: StringTableRef
 
+func newUrl*: Url =
+  Url(scheme: "", username: "", password: "", hostname: "",
+    port: "", path: "", fragment: "", query: newStringTable())
+
 func encodeUrlComponent*(s: string): string =
   ## Takes a string and encodes it in the URL format.
   result = newStringOfCap(s.len)
@@ -47,10 +51,59 @@ func decodeUrlComponent*(s: string): string =
         result.add s[i]
     inc i
 
+func host*(url: Url): string =
+  ## Returns Host and port part of the URL as a string.
+  ## Example: "example.com:8042"
+  return url.hostname & ":" & url.port
+
+func search*(url: Url): string =
+  ## Returns the search part of the URL as a string.
+  ## Example: "name=ferret&age=12&legs=4"
+  var i = 0
+  for (key,value) in url.query.pairs:
+    if i > 0:
+      result.add '&'
+    inc i
+    result.add encodeUrlComponent(key)
+    result.add '='
+    result.add encodeUrlComponent(value)
+
+func authority*(url: Url): string =
+  ## Returns the authority part of URL as a string.
+  ## Example: "admin:hunter1@example.com:8042"
+  if url.username.len > 0:
+    result.add url.username
+    if url.password.len > 0:
+      result.add ':'
+      result.add url.password
+    result.add '@'
+  if url.hostname.len > 0:
+    result.add url.hostname
+  if url.port.len > 0:
+    result.add ':'
+    result.add url.port
+
+func `$`*(url: Url): string =
+  ## Turns Url into a string. Preserves query string param ordering.
+  if url.scheme.len > 0:
+    result.add url.scheme
+    result.add "://"
+  result.add url.authority
+  if url.path.len > 0:
+    if url.path[0] != '/':
+      result.add '/'
+    result.add url.path
+  if url.query.len > 0:
+    result.add '?'
+    result.add url.search
+  if url.fragment.len > 0:
+    result.add '#'
+    result.add url.fragment
+
 func parseUrl*(s: string): Url =
   ## Parses a URL or a URL into the Url object.
   var s = s
-  var url = Url()
+  var url = newUrl()
 
   let hasFragment = s.rfind('#')
   if hasFragment != -1:
@@ -102,54 +155,6 @@ func parseUrl*(s: string): Url =
   url.hostname = s
   return url
 
-func host*(url: Url): string =
-  ## Returns Host and port part of the URL as a string.
-  ## Example: "example.com:8042"
-  return url.hostname & ":" & url.port
-
-func search*(url: Url): string =
-  ## Returns the search part of the URL as a string.
-  ## Example: "name=ferret&age=12&legs=4"
-  var i = 0
-  for (key,value) in url.query.pairs:
-    if i > 0:
-      result.add '&'
-    inc i
-    result.add encodeUrlComponent(key)
-    result.add '='
-    result.add encodeUrlComponent(value)
-
-func authority*(url: Url): string =
-  ## Returns the authority part of URL as a string.
-  ## Example: "admin:hunter1@example.com:8042"
-  if url.username.len > 0:
-    result.add url.username
-    if url.password.len > 0:
-      result.add ':'
-      result.add url.password
-    result.add '@'
-  if url.hostname.len > 0:
-    result.add url.hostname
-  if url.port.len > 0:
-    result.add ':'
-    result.add url.port
-
-func `$`*(url: Url): string =
-  ## Turns Url into a string. Preserves query string param ordering.
-  if url.scheme.len > 0:
-    result.add url.scheme
-    result.add "://"
-  result.add url.authority
-  if url.path.len > 0:
-    if url.path[0] != '/':
-      result.add '/'
-    result.add url.path
-  if url.query.len > 0:
-    result.add '?'
-    result.add url.search
-  if url.fragment.len > 0:
-    result.add '#'
-    result.add url.fragment
 
 func removeDotSegments(path: string): string =
   if path.len == 0: return ""
@@ -211,7 +216,9 @@ func combine*(base: Url, reference: Url): Url =
     let qux = combine(parseUri("https://nim-lang.org/foo/bar/"), parseUri("baz"))
     assert qux.path == "/foo/bar/baz"
 
-  template setAuthority(dest, src): untyped =
+  result = newUrl()
+
+  func setAuthority(dest: var Url, src: Url) =
     dest.hostname = src.hostname
     dest.username = src.username
     dest.port = src.port

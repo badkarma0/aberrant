@@ -35,11 +35,9 @@ proc get_root*: string =
 proc get_dl_root*: string =
   return get_root() / "downloads"
 
-proc `$`*(node: XmlNode, q: string): XmlNode =
-  result = node.querySelector(q)
+proc `$`*(node: XmlNode, q: string): XmlNode = node.querySelector(q)
 
-proc `$$`*(node: XmlNode, q: string): seq[XmlNode] =
-  result = node.querySelectorAll(q)
+proc `$$`*(node: XmlNode, q: string): seq[XmlNode] = node.querySelectorAll(q)
 
 proc fetch_html*(url: Url): XmlNode =
   let res = fetch($url)
@@ -132,12 +130,34 @@ template scraper*(id: string, body: untyped) =
         let data {.inject.} = fetchJson(url)
         block:
           jpage_body
+
     scrapers[id] = Scraper(
       name: id, 
       rex: rex,
-      srun: proc (xurl {.inject.}: Url) {.thread.} =
+      srun: proc (xurl {.inject.}: Url, args {.inject.}: ArgStore = gArgStore) {.thread.} =
+        dbg args
+        template get_url =
+          var v_start_url {.inject.} = args.get("arg1").parseUrl
+          if v_start_url.empty:
+            if not xurl.empty:
+              v_start_url = xurl
+            else: 
+              err "please provide an url"
+              return
+        get_url()
         block:
           exec_body
+    )
+  template extend(sn: string, sargs: string) =
+    scrapers[id] = Scraper(
+      name: id, 
+      rex: rex,
+      srun: proc (xurl {.inject.}: Url, args {.inject.}: ArgStore = gArgStore) {.thread.} =
+        {.cast(gcsafe).}:
+          let p_args: ArgStore = parse_args(sargs)
+          for k,v in args:
+            p_args[k] = v
+          scrapers[sn].srun(xurl, p_args)
     )
   block:
     body

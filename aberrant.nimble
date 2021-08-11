@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.3.0"
+version       = "0.4.0"
 author        = "PsychoClay"
 description   = "web scraper"
 license       = "WTFPL"
@@ -14,6 +14,4 @@ bin           = @["aberrant"]
 requires "nim >= 1.4.8"
 requires "ws"
 requires "nimquery"
-requires "zippy"
 requires "termstyle"
-requires "urlly"

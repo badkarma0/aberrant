@@ -86,6 +86,7 @@ scraper "kvs":
         parts[3] = uhash
         video.path = parts.join("/").replace(re"\/$", "")
         # video.query["rnd"] = $rnd 
+        dbg video
         let dl = make_download($video, getDlRoot() / "kvs" / video.path.extractFilename, true)
         dl.headers = headers
         dl.download

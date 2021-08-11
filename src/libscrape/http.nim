@@ -1,7 +1,7 @@
 # libcurl wrapper for downloading and http requests
-import ark, lag
-import libcurl, zippy
-import os, times, strformat, termstyle, urlly, math, strutils
+import ark, lag, url
+import libcurl
+import os, times, strformat, termstyle, math, strutils
 import httpclient
 import asyncdispatch
 import threadpool
@@ -51,6 +51,7 @@ arg v_curl_verbose, "curl-verbose", false, help = "curl verbose"
 ra "chunk-size", "", help = "if chunked, chunk size"
 arg v_chunk_count, "chunk-count", 0, help = "if chunked, chunk count, overwrites chunk-size"
 arg v_sequential, "seq", false, help = "no threaded downloading"
+arg v_overwrite, "overwrite", false, help = "overwrite existing files"
 var
   download_channel: Channel[Download]
   dls: seq[Download]
@@ -130,11 +131,6 @@ func HRtoBytes(s: string): int =
   debugEcho n,i
   pow(1024.toFloat, i.toFloat).toInt * n
     
-
-const
-  s_skipped = italic("Skipped")
-  s_downloaded = bold("Downloaded")
-  s_failed = "Failed".style(termRed & termNegative)
 
 # ----------------------------------------------------------------
 # curl stuff
@@ -242,15 +238,9 @@ proc run(cr: CurlRequest): Code =
 
 # END CurlRequest methods
 
-proc add_default_headers(req: Request) =
-  if req.headers["accept-encoding"].len == 0:
-    # If there isn't a specific accept-encoding specified, enable gzip
-    req.headers["accept-encoding"] = "gzip"
-
 proc fetch*(req: Request): Response {.gcsafe.} =
   result = Response()
 
-  req.add_default_headers()
   let cr = curl_easy_request()
   opts cr:
     OPT_URL => $req.url
@@ -268,8 +258,6 @@ proc fetch*(req: Request): Response {.gcsafe.} =
     result.headers = cr.get_headers()
     result.body = cr.get_body()
     result.code = code.int
-    if result.headers["Content-Encoding"] == "gzip":
-      result.body = uncompress(result.body, dfGzip)
   else:
     result.error = $easy_strerror(ret)
   cr.cleanup()
@@ -437,7 +425,7 @@ proc make_download*(url, path: string, opts: Options, flags: Flags): Download =
     flags: flags
   )
 
-proc make_download*(url, path = "", overwrite = false, show_progress = false): Download =
+proc make_download*(url, path = "", overwrite = v_overwrite, show_progress = v_show_progress): Download =
   result = make_download(
     url, path, Options(
       overwrite: overwrite,
@@ -448,11 +436,19 @@ proc make_download*(url, path = "", overwrite = false, show_progress = false): D
     )
   )
 
+  
+const
+  s_skipped = italic("Skipped")
+  s_downloaded = bold("Downloaded")
+  s_failed = "Failed".style(termRed & termNegative)
+  s_attempt = "Try Download"
+
 proc download*(dl: Download) =
  try:
   if v_dry:
     log &"Dry Find {dl}"
     return
+  logv &"{s_attempt}: {dl.url}"
   dl.download_base()
   let fs = dl.path.getFileSize.bytesToHR
   let t = dl.flags.time

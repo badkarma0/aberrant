@@ -1,7 +1,7 @@
 # parseopt wrapper
-import base, lag
 import termstyle, strformat, strutils, parseopt, algorithm, sequtils, sugar
-import macros, json
+import macros, json, tables
+import strtabs
 type
   Arg* = ref object
     name*: string
@@ -11,8 +11,10 @@ type
     smod*: string
     def: string
   Args = seq[Arg]
-
+  ArgStore* = StringTableRef
 var r_args: Args
+
+
 
 proc print(arg: Arg) =
   var 
@@ -27,7 +29,7 @@ proc print(arg: Arg) =
 proc print_mod(s: string) =
   echo bold negative &"\n {s}"
 
-proc print_help*(title,desc: string) =
+proc print_help*(cats: openArray[string], title,desc: string) =
   # echo box(&" {desc} ", '0', cc = termCyan & termNegative, sc = termNegative)
   echo title
   echo ""
@@ -39,40 +41,41 @@ proc print_help*(title,desc: string) =
   for arg in r_args:
     if arg.smod == "":
       arg.print
-  for scraper in scrapers.values:
-    scraper.name.print_mod
+  for cat in cats:
+    cat.print_mod
     for arg in r_args:
-      if arg.smod == scraper.name:
+      if arg.smod == cat:
         arg.print
 
 proc get_args_as_json*: JsonNode =
   %*r_args
 
-proc parse(): seq[KVPair] =
-  var args: seq[KVPair] = @[]
+proc parse_args*(args: string = ""): ArgStore =
+  result = newStringTable()
   var ac = 0
-  for kind, key, val in getopt():
+  var opp = initOptParser(args) 
+  for kind, key, val in opp.getopt:
     case kind:
     of cmdArgument:
-      args.add KVPair(key: &"arg{ac}", value: key)
+      result[&"arg{ac}"] = key
       ac += 1
     of cmdLongOption, cmdShortOption:
       if val == "":
-        args.add KVPair(key: key, value: "true")
+        result[key] = "true"
       else:
-        args.add KVPair(key: key, value: val)
+        result[key] = val
     of cmdEnd:
       break
-  args
+
+let gArgStore*: ArgStore = parse_args()
 
 
 proc arg_starup_check*: bool =
-  let parsed = parse()
   r_args.sort do (a,b: Arg) -> int:
     a.name.cmp b.name
   for arg in r_args:
     let name = arg.name
-    if parsed.any((a) => a.key == name):
+    if gArgStore.hasKey(name):
       continue
     if arg.req:
       echo &"Error Missing arg: {arg.name}, here is the relevant help"
@@ -81,30 +84,42 @@ proc arg_starup_check*: bool =
       return true
   return false
 
-template loa(name: string, def: typed, body: untyped) =
-  for ar {.inject.} in parse():
-    if ar.key == name:
-      try:
-        block:
-          body
-        break
-      except Exception:
-        err &"{name} has wrong type"
-
-  return def
+template loa(ags: ArgStore, name: string, def: typed, body: untyped) =
+  {.cast(gcsafe).}:
+    try:
+      var ar {.inject.} = ags[name]
+      block:
+        body
+    except KeyError:
+      discard
+    except Exception:
+      echo &"{name} has wrong type"
+      echo getCurrentExceptionMsg()
+    return def
 
 proc ga*(name: string, def = ""): string =
-  loa name, def:
-    return ar.value
+  loa gArgStore, name, def:
+    return ar
 proc ga*(name: string, def: bool): bool =
-  loa name, def:
-    return ar.value.parseBool
+  loa gArgStore, name, def:
+    return ar.parseBool
 proc ga*(name: string, def: int): int =
-  loa name, def:
-    return ar.value.parseInt
+  loa gArgStore, name, def:
+    return ar.parseInt
 proc ga*(name: string, def: float): float =
-  loa name, def:
-    return ar.value.parseFloat
+  loa gArgStore, name, def:
+    return ar.parseFloat
+proc ga*[T](name: string, def: T = ""): T =
+  loa gArgStore, name, def:
+    return ar.parseJson.to T
+
+proc get*(ags: ArgStore, name: string): string =
+  loa ags, name, "":
+    return ar
+
+proc get*[T](ags: ArgStore, name: string, def: T): T =
+  loa ags, name, def:
+    return ags[name].parseJson.to T
 
 proc add_arg(name, kind, help, smod: string, req: bool, def: string) =
   r_args.add Arg(name: name, help: help, kind: kind, req: req, smod: smod, def: def)
@@ -115,3 +130,4 @@ template ra*(name: string, def: typed = "", help = "", req = false, smod = "") =
 template arg*(arg_name: untyped, name: string, def: typed = "", help = "", req = false, smod = "") =
   ra name, def, help, req, smod
   var `arg_name` {.inject.} = ga(name, def)
+
