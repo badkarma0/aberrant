@@ -1,6 +1,7 @@
 import scraper
 import asyncdispatch, asynchttpserver, ws
 import strutils
+import autoindex
 type
   RPCMSG = ref object
     msg: string
@@ -33,15 +34,18 @@ proc write_out(m: string) =
   out_channel.send(rpcmsg m)
 
 proc cb(req: asynchttpserver.Request) {.async, gcsafe.} =
-  try:
-    var ws = await newWebSocket(req)
-    pcon[].add ws
-    asyncCheck ws.send ServerClientMsg(notif:"connected").pack
-    while ws.readyState == Open:
-      let packet = await ws.receiveStrPacket()
-      in_channel.send(rpcmsg(packet, ws))
-  except:
-    echo getCurrentExceptionMsg()
+  if req.url.path.startsWith "/api/index":
+    asyncCheck req.handle_autoindex_request
+  else:
+    try:
+      var ws = await newWebSocket(req)
+      pcon[].add ws
+      asyncCheck ws.send ServerClientMsg(notif:"connected").pack
+      while ws.readyState == Open:
+        let packet = await ws.receiveStrPacket()
+        in_channel.send(rpcmsg(packet, ws))
+    except:
+      echo getCurrentExceptionMsg()
 
 proc ws_worker() {.async.} =
   var server = newAsyncHttpServer()

@@ -45,3 +45,6 @@ test "json string":
   echo "1000".parseJson.to int
   echo "\"1000\"".parseJson.to string
   echo "1000".parseJson.to string
+
+test "or":
+  echo if "" != "": "" else: "/"

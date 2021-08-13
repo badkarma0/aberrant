@@ -1,14 +1,14 @@
 import strformat, strutils
 import scrapers/s_import
 import termstyle
-import times, options, urlly, nre
+import times, options, nre
 import os, std.exitprocs
 import terminal, asyncdispatch
 import libscrape/rpc
 import libscrape/base
 import libscrape
 # import gui/main
-from libcurl import version
+from libscrape/libcurl import version
 
 proc get_scraper(scrapers: Scrapers, name: string): Option[Scraper] =
   for scraper in scrapers.values:

@@ -1,5 +1,5 @@
 import base
-import strformat, termstyle, illwill_thread, sequtils, strutils
+import strformat, termstyle, illwill, sequtils, strutils
 import tables
 import nre, os
 # LOGGING
@@ -84,7 +84,7 @@ template dbg_exception* =
 
 proc log_worker() {.thread.} =
   var 
-    iw: IllWill
+    # iw: IllWill
     tb: TerminalBuffer
     thread_registry: seq[int]
     last_messages: Table[int, Message]
@@ -92,8 +92,9 @@ proc log_worker() {.thread.} =
   let
     r_ascii = re"\e\[\d{1,2}m"
   if lt_tui:
-    iw = newIllWill()
-    iw.illwillInit(fullscreen=true)
+    # iw = newIllWill()
+    illwillInit(fullscreen=true)
+    # iw.illwillInit(fullscreen=true)
     # setControlCHook(exit_tui)
     hideCursor()
     tb = newTerminalBuffer(terminalWidth(), terminalHeight()) 
@@ -102,36 +103,39 @@ proc log_worker() {.thread.} =
     if not tried.dataAvailable:
       if lt_exit:
         if lt_tui:
-          iw.illwillDeinit()
+          illwillDeinit()
+          # iw.illwillDeinit()
           showCursor()
         break
       sleep 100
       continue
     let message: Message = tried.msg
     if lt_tui:
-      case message.kind:
-      of mkCmd:
-        case message.cmd_kind:
-        of ckAddThead:
-          thread_registry.add message.add_thread
-        of ckDelThread:
-          for i in 0..thread_registry.high - 1:
-            if thread_registry[i] == message.del_thread:
-              thread_registry.delete i
-        of ckSetWriteProc:
-          discard
-        tb.clear()
-      of mkMsg:
-        tb.clear()
-        if not (message.tid in thread_registry):
-          break
-        last_messages[message.tid] = message
-        var i = 0
-        for msg in last_messages.values:
-          tb.write(0, i * 4, $msg.tid, "::", msg.content.replace(r_ascii, ""))
-          tb.drawHorizLine(0, terminalWidth() - 2, i * 4 + 3)
-          i += 1
-        iw.display(tb)
+      {.cast(gcsafe).}:
+        case message.kind:
+        of mkCmd:
+          case message.cmd_kind:
+          of ckAddThead:
+            thread_registry.add message.add_thread
+          of ckDelThread:
+            for i in 0..thread_registry.high - 1:
+              if thread_registry[i] == message.del_thread:
+                thread_registry.delete i
+          of ckSetWriteProc:
+            discard
+          tb.clear()
+        of mkMsg:
+          tb.clear()
+          if not (message.tid in thread_registry):
+            break
+          last_messages[message.tid] = message
+          var i = 0
+          for msg in last_messages.values:
+            tb.write(0, i * 4, $msg.tid, "::", msg.content.replace(r_ascii, ""))
+            tb.drawHorizLine(0, terminalWidth() - 2, i * 4 + 3)
+            i += 1
+          tb.display()
+        # iw.display(tb)
     elif message.kind == mkCmd and message.cmd_kind == ckSetWriteProc:
       # echo "setting write proc"
       write_proc = message.write_proc

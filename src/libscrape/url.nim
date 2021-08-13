@@ -10,7 +10,7 @@
 ## this is a merge of treeform/urlly and std/uri
 ##
 
-import strutils, strtabs
+import strutils, strtabs, uri
 export strtabs
 
 type
@@ -18,7 +18,6 @@ type
     scheme*, username*, password*: string
     hostname*, port*, path*, fragment*: string
     query*: StringTableRef
-
 func newUrl*: Url =
   Url(scheme: "", username: "", password: "", hostname: "",
     port: "", path: "", fragment: "", query: newStringTable())
@@ -304,3 +303,6 @@ func `/`*(x: Url, path: string): Url =
     if path.len == 0 or path[0] != '/':
       result.path.add '/'
     result.path.add(path)
+
+
+proc toUrl*(u: Uri): Url = parseUrl($u)

@@ -161,7 +161,7 @@ proc curl_write_file_chunked(
   let crange = cast[ptr CurlRange](outstream)[]
   crange.file.setFilePos crange.cur
   let wsize = crange.file.writeBuffer(buffer, count)
-  crange.file.flushFile()
+  # crange.file.flushFile()
   if wsize != count:
     raise CurlFileWriteFailed()
   crange.cur += wsize 
