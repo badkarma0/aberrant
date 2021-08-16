@@ -136,7 +136,7 @@ iterator read_proxy_file(file: string): string =
     if line.strip.len != 0:
       yield line
 
-proc proxay_worker(p: pointer) {.thread, async.} =
+proc proxay_worker(p: pointer) {.thread} =
   let au = azenv.parseUrl
   var 
     ap = cast[ptr (ArgStore, Counter)](p)[]
@@ -173,12 +173,12 @@ proc proxay_worker(p: pointer) {.thread, async.} =
       inc counter.succ      
     inc counter.done
 
-proc run_workers(v_threads:int, udata: pointer) {.async.}  =
-  var ts: seq[Future[void]]
-  for i in 0..v_threads-1:
-    ts.add proxay_worker(udata)
-  for f in ts:
-    await f
+# proc run_workers(v_threads:int, udata: pointer) {.async.}  =
+#   var ts: seq[Future[void]]
+#   for i in 0..v_threads-1:
+#     ts.add proxay_worker(udata)
+#   for f in ts:
+#     await f
 
 scraper "proxay":
   ra "arg1", req = true, help = "a file"
@@ -218,10 +218,10 @@ scraper "proxay":
     var counter = udata[][1]
     counter.total = proxies.len
 
-    # ezspawn(v_threads, proxay_worker, udata)
-    # ezsync()
+    ezspawn(v_threads, proxay_worker, udata)
+    ezsync()
 
-    waitFor run_workers(v_threads, udata)
+    # waitFor run_workers(v_threads, udata)
 
     log counter.succ
     log counter.total
