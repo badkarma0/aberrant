@@ -1,6 +1,6 @@
 
 import ../libscrape
-
+import nre
 const
   top_url = "https://cdn.cyberdrop.me/hits/"
   base_url = "https://cyberdrop.me/"

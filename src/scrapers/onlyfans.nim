@@ -1,7 +1,7 @@
 
 
 import ../libscrape
-
+import nre
 
 scraper "onlyfans":
   match re"onlyfans.com"

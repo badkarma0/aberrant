@@ -1,6 +1,6 @@
 
 import ../libscrape
-import times
+import times, nre
 
 const
   hash_posts = "ea4baf885b60cbf664b34ee760397549"

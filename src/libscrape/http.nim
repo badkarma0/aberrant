@@ -26,17 +26,19 @@ type
     headers*: seq[Header]
     verb*: string
     body*: string
+    proxy*: string
+    cb_before_run*: proc(cr: CurlRequest) {.gcsafe.}
   Response* = ref object
     url*: Url
     headers*: seq[Header]
     code*: int
     body*: string
     error*: string
-  CurlRequest = ref object
-    curl: Pcurl
-    headerData: ref string
-    bodyData: ref string
-    headerList: Pslist
+  CurlRequest* = ref object
+    curl*: Pcurl
+    headerData*: ref string
+    bodyData*: ref string
+    headerList*: Pslist
   CurlRange = ref object
     file: File
     cur: int
@@ -187,10 +189,10 @@ proc xfer(data: pointer, dltot, dlnow, ultot, ulnow: float) =
 
 # CurlRequest methods
 
-template opt(cr: CurlRequest, o: Option, x: typed) =
+template opt*(cr: CurlRequest, o: Option, x: typed) =
   discard cr.curl.easy_setopt(o,x)
 
-template opts(cr: CurlRequest, body: untyped) =
+template opts*(cr: CurlRequest, body: untyped) =
   proc `=>`[T](option: Option, arg: T) {.varargs.} =
     discard cr.curl.easy_setopt(option, arg)
   block:body
@@ -248,7 +250,13 @@ proc fetch*(req: Request): Response {.gcsafe.} =
     OPT_CUSTOMREQUEST => req.verb.toUpperAscii()
     if req.body.len > 0:
       OPT_POSTFIELDS => req.body
+    if req.proxy != "":
+      OPT_PROXY => req.proxy
   cr.set_headers req.headers
+
+  if req.cb_before_run != nil:
+    req.cb_before_run(cr)
+
   let ret = cr.run()
 
   result.url = req.url
@@ -286,6 +294,10 @@ proc fetch*(url: string, verb = "get", headers = newSeq[Header]()): string =
 
 proc isOk*(res: Response): bool =
   return res.error.len == 0 and 200 < res.code and res.code > 299
+
+# -------------------------------
+# download with curl
+# -------------------------------
 
 proc curl_download_chunked*(dl: Download) =
   let req = Request()
@@ -397,6 +409,17 @@ proc curl_download*(dl: Download) =
 
   if ret != E_OK:
     raise newException(Exception, "download failed")
+
+# --------------------------------------
+# same as above but with asynchttpclient
+# --------------------------------------
+
+import httpclient, asyncdispatch
+
+proc std_download_chunked*(dl: Download) =
+  var client = newAsyncHttpClient()
+  
+
 
 # ------------------------------------------------------
 # public download/request api

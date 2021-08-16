@@ -1,5 +1,5 @@
 import ../libscrape
-import xmltree
+import xmltree, nre
 
 type
   Target = ref object
@@ -165,7 +165,7 @@ scraper "mcrawl":
   ra "dregex"
   ra "cregex"
   ra "map", false, help = "create a site map, no downloads"
-  ra "cm", 0, help = &"maximum links to crawl"
+  ra "cm", 0, help = "maximum links to crawl"
   ra "cml", 0, help = "maximum links to crawl per level"
   ra "dm", 0, help = "maximum links to download"
   ra "dml", 0, help = "maximum links to download per level"

@@ -1,5 +1,5 @@
 import ../libscrape
-
+import nre
 const base = "http://imgbox.com/g"
 
 scraper "imgbox":

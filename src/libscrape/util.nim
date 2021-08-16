@@ -12,3 +12,5 @@ template time*(s: string, b) =
 # macro rtime*(p) =
 #   p.forNode(nnkCall, (c) => Call(Ident"time", StrLit"c", c))
 #   echo p.treeRepr
+
+proc newShared*[T]: ptr T = cast[ptr T](allocShared0(sizeof(T)))

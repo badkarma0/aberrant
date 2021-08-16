@@ -6,9 +6,9 @@ import nimquery
 import json
 import nre, options, termstyle, strformat, strutils
 import http
-export base, xmltree, json, strformat, os, nre, strutils, termstyle
-import ark, lag, http, base, proxay, ezthread, url
-export ark, lag, http, base, proxay, ezthread, url
+export base, xmltree, json, strformat, os, strutils, termstyle
+import ark, lag, http, base, proxay, ezthread, url, util
+export ark, lag, http, base, proxay, ezthread, url, util
 
 import times
 const 
@@ -144,7 +144,8 @@ template scraper*(id: string, body: untyped) =
             else: 
               err "please provide an url"
               return
-        get_url()
+        template gag(arg_var: untyped, name: string, def: untyped = "") =
+          var `arg_var` {.inject.} = args.get(name, def)
         block:
           exec_body
     )
@@ -162,12 +163,12 @@ template scraper*(id: string, body: untyped) =
   block:
     body
 
-proc run*(scraper: Scraper, url = "") =
+proc run*(scraper: Scraper, url = "", args = gArgStore) =
   log &"Using Scraper: {scraper.name}"
   let st = cpuTime()
   # var t:Thread[Url]
   # t.createThread scraper.srun, url.parseUrl
   # t.joinThread()
-  scraper.srun url.parseUrl
+  scraper.srun url.parseUrl, args
   let ft = cpuTime() - st
   log &"Operation took {ft} seconds"

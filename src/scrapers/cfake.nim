@@ -2,6 +2,7 @@ import strutils
 import math
 import xmltree
 import strformat
+import nre
 import ../libscrape
 
 const site = "http://cfake.com/"

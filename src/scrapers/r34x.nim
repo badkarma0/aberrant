@@ -11,9 +11,9 @@ scraper "r34x":
   ra "full", false
   exec:
     var 
-      v_tags = ga"arg1"
-      v_max = "max".ga 100
-      v_full = "full".ga false
+      v_tags = args.get"arg1"
+      v_max = args.get("max", 100)
+      v_full = args.get("full", false)
     v_tags = v_tags.replace(" ", "+")
     # let v_tags = ga("arg1").replace(" ", "+")
     # let v_max = ga("max", 100)

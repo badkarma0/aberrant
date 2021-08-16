@@ -1,6 +1,6 @@
 
 import ../libscrape
-import math
+import math, nre
 
 const hash_range = 16
 func calc_seed(lc: string):string =

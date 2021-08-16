@@ -2,13 +2,14 @@ import scraper
 import asyncdispatch, asynchttpserver, ws
 import strutils
 import autoindex
+import threadpool, nre
 type
   RPCMSG = ref object
     msg: string
     source: WebSocket
   ClientServerMsg = ref object
     exec,id,notif: Option[string]
-    params: Option[seq[string]]
+    params: string
   ServerClientMsg = ref object
     result,error,id,notif:string
 
@@ -76,10 +77,12 @@ proc rpc_worker() {.async.} =
           result $get_args_as_json()
         elif scrapers.contains exec:
           var scraper = scrapers[exec]
-          if msg.params.isSome and msg.params.get.high > -1: 
-            scraper.run(msg.params.get[0])
+          if msg.params != "":
+            
+            let store = parse_args "0 " & msg.params
+            spawn scraper.run("", store)
           else:
-            scraper.run()
+            spawn scraper.run()
         else:
           err exec & " not found : " & id
     ifout:
