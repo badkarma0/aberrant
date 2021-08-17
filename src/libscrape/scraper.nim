@@ -5,10 +5,9 @@ import xmltree
 import nimquery
 import json
 import nre, options, termstyle, strformat, strutils
-import http
 export base, xmltree, json, strformat, os, strutils, termstyle
-import ark, lag, http, base, proxay, ezthread, url, util
-export ark, lag, http, base, proxay, ezthread, url, util
+import ark, lag, netclient, base, proxay, ezthread, url, util
+export ark, lag, netclient, base, proxay, ezthread, url, util
 
 import times
 const 
@@ -114,7 +113,7 @@ template scraper*(id: string, body: untyped) =
           pages_body
     template page(spath: string, page_body: untyped) =
       var urls {.inject.}: seq[string]
-      var headers {.inject.}: seq[http.Header]
+      var headers {.inject.}: seq[Header]
       template header(name, val: string) =
         headers[name] = val
       block:

@@ -104,29 +104,78 @@ template spawn_void_thread*(p: VoidThreadProc) =
 # another attempt at threading abstraction
 import sharedtables
 type
-  ThreadRegistry = SharedTable[int, seq[Thread[pointer]]]
+  ThreadGroup = ref object
+    threads: seq[Thread[pointer]]
+    id: uint32
+  ThreadRegistry = SharedTable[int, seq[ThreadGroup]]
   PointerProc = proc (p: pointer) {.thread.}
 
-var thread_registry: ThreadRegistry 
+var 
+  thread_registry: ThreadRegistry 
+  g_group_id: uint32 = 1
 thread_registry.init()
 
+proc `==`(a,b: ThreadGroup): bool = a.id == b.id
+proc `[]`(tg: ThreadGroup, i: int): var Thread[pointer] = tg.threads[i]
 
-proc ezspawn*(amount: int, p: PointerProc, a: pointer) =
+proc ezspawn*(p: PointerProc, a: pointer = nil, amount: int = 1): ThreadGroup =
+  ## spawn some amount of threads and adds them to a group
   {.cast(gcsafe).}:
     let id = getThreadId()
-    # var thread = newShared[Thread[pointer]]()
-    # thread[].createThread(p, a)
     discard thread_registry.hasKeyOrPut(id, @[])
     thread_registry.withValue(id, ts) do:
-      ts[].setLen amount
-      for i in 0..amount-1:
-        ts[][i].createThread(p, a)
+      var s = ts[]
+      s.setLen(s.len + 1)
+      s[^1] = ThreadGroup(id:g_group_id)
+      inc g_group_id
+      s[^1].threads.setLen(amount)
+      for i in 0..amount - 1:
+        s[^1][i].createThread(p, a)
+      return s[^1]
 
 
-proc ezsync* =
+proc ezsync*(tg: ThreadGroup = ThreadGroup()) =
   ## waits for all the threads spawned from the current thread
   {.cast(gcsafe).}:
     let id = getThreadId()
     thread_registry.withValue(id, ts) do:
-      ts[].joinThreads()
-      thread_registry.del id
+      var s = ts[]
+      if tg.id == 0:
+        for stg in s:
+          stg.threads.joinThreads()
+        thread_registry.del id
+      else:
+        tg.threads.joinThreads()
+        for i, stg in s:
+          if stg == tg:
+            s.del i
+
+type
+  EZWriteData* = (string, ptr Channel[string])
+
+proc ez_write_thread*(p: pointer) {.thread.} =
+  ## example:
+  ## var data = newShared[(string, Channel[string])]()
+  ## data[1].open()
+  ## data[1].send "some line to be written to file"
+  ## data[0] = "someFile.txt"
+  ## var tg = ezspawn(ez_write_thread, data)
+  ## tg.ezsync()
+  ## deallocShared(data)
+  var
+    data = cast[ptr (string, ptr Channel[string])](p)
+    file_name = data[][0]
+    channel = data[][1]
+    file = open(file_name, fmWrite)
+  dbg file_name
+  while true:
+    let pek = channel[].peek()
+    if pek < 1:
+      if pek == -1:
+        dbg "closing write thread", getThreadId()
+        break
+      sleep 1000
+      continue
+    let msg = channel[].recv()
+    file.writeLine(msg)
+  file.close()

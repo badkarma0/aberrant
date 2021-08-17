@@ -115,20 +115,17 @@ let
   ]
 
 import ../libscrape
-import sets, re, threadpool, ../libscrape/libcurl, asyncdispatch
+import sets, re, threadpool, ../libscrape/libcurl, asyncdispatch, httpclient
 
-type Counter = ref object
-  fail,succ,done,total,http,https,socks4,socks5: int
-type Pa = ref object
-  p_counter: ptr Counter
-  args: ArgStore
+type 
+  Counter = ref object
+    fail,succ,done,total,http,https,socks4,socks5: int
+  Udata = (ArgStore, Counter, ptr Channel[string], ptr Channel[string])
 const 
   azenv = "http://azenv.net"
   g_protocols = ["http", "https", "socks4", "socks5"]
 
-var
-  exit = false
-  channel: Channel[string]
+let
   r_ip_port = re"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}"
 
 iterator read_proxy_file(file: string): string =
@@ -136,27 +133,60 @@ iterator read_proxy_file(file: string): string =
     if line.strip.len != 0:
       yield line
 
-proc proxay_worker(p: pointer) {.thread} =
-  let au = azenv.parseUrl
+proc process_page(url: string): Future[HashSet[string]] {.async.} =
+  var client = newAsyncHttpClient()
+  log "get", url
+  var data = ""
+  try:
+    data = await client.getContent(url)
+  except Exception:
+    discard
+  for m in data.findAll(r_ip_port):
+    result.incl m
+  log "found", result.len, "proxies"
+
+proc process_pages(): Future[HashSet[string]] {.async.} =
+  var ts: seq[Future[HashSet[string]]]
+  for source in g_sources:
+    ts.add process_page(source)  
+  for f in ts:
+    result.incl await f
+
+proc process_pages_sequential(max: int): Future[HashSet[string]] {.async.} =
+  var ts: seq[Future[HashSet[string]]]
+  for source in g_sources:
+    let proxies = await process_page(source)
+    result.incl proxies
+    if max != 0 and result.len > max:
+      var nset: HashSet[string]
+      for _ in 0..max-1:
+        nset.incl result.pop
+      return nset
+
+proc proxay_worker(udata: Udata) {.async.} =
   var 
-    ap = cast[ptr (ArgStore, Counter)](p)[]
-    args = ap[0]
-    counter = ap[1]
+    channel = udata[2]
+    args = udata[0]
+    counter = udata[1]
+    write_channel = udata[3]
     protocols = args.get("protocols", g_protocols)
     f = true
-  ezloop_noclose channel, f:
+  while true:
+    let pek = channel[].peek()
+    if pek < 1: break
+    let message = channel[].recv() 
     var fails = 0
     for prot in protocols:
-      var r = Request()
-      r.url = au
-      r.verb = "GET"
-      r.proxy = prot & "://" & message
-      r.cb_before_run = 
-        proc(cr: CurlRequest) =
-          opt cr, OPT_TIMEOUT, 5
-      log r.proxy
-      let res = r.fetch()
-      if res.isOk:
+      let prox = prot & "://" & message
+      var ok = false
+      logv prox
+      try:
+        ok = await withTimeout(std_proxy_check(azenv, prox), 5000)
+      except Exception:
+        ok = false
+      if ok:
+        log "OK", prox
+        write_channel[].send(prox)
         if prot == "http":
           inc counter.http
         if prot == "https":
@@ -172,62 +202,100 @@ proc proxay_worker(p: pointer) {.thread} =
     else:
       inc counter.succ      
     inc counter.done
+    log counter.done, "/", counter.total
 
-# proc run_workers(v_threads:int, udata: pointer) {.async.}  =
-#   var ts: seq[Future[void]]
-#   for i in 0..v_threads-1:
-#     ts.add proxay_worker(udata)
-#   for f in ts:
-#     await f
+
+proc run_workers(workers:int, udata: Udata) {.async.}  =
+  var ts: seq[Future[void]]
+  for i in 0..workers-1:
+    ts.add proxay_worker(udata)
+  for f in ts:
+    await f
+
+
+proc proxay_thread(p: pointer) {.thread.} =
+  var 
+    udata = cast[ptr Udata](p)[]
+    args = udata[0]
+    v_workers = args.get("workers", 100)
+  
+  waitFor run_workers(v_workers, udata)
 
 scraper "proxay":
   ra "arg1", req = true, help = "a file"
-  ra "threads", def = 10, help = "number of threads"
+  ra "threads", def = 0, help = "number of threads"
+  ra "workers", def = 100, help = "number of workers per thread"
   ra "protocols", def = g_protocols, help = "protocols to check"
+  ra "max", def = 1000, help = "max proxies to check"
+  ra "fout", def = "working.txt", help = "file to output working proxies to"
   exec:
     gag v_file, "arg1"
-    gag v_threads, "threads", 10
-    # if not v_file.fileExists:
-    #   err "file not found"
-    #   return
-     
-    
-    var proxies: HashSet[string]
-    {.cast(gcsafe).}:
-      for source in g_sources:
-        let data = fetch(source)
-        log "get", source
-        var i = 0
-        for m in data.findAll(r_ip_port):
-          inc i
-          proxies.incl m
-        log "found", i, "proxies"
-        if proxies.len > 100:
-          break
-    log "TOTAL PROXIES FOUND:", proxies.len
+    gag v_threads, "threads", 0
+    gag v_max, "max", 1000
+    gag v_workers, "workers", 100
+    gag v_fout, "fout", "working.txt"
 
-    channel.open()
+    var
+      channel = newShared[Channel[string]]()
+      write_channel = newShared[Channel[string]]()
+    channel[].open()    
+    write_channel[].open()
 
-    for p in proxies:
-      channel.send p
-    # for proxy in v_file.read_proxy_file: proxay_send proxy
-
-    var udata = newShared[(ArgStore, Counter)]()
+    var udata = newShared[Udata]()
     udata[][0] = args
     udata[][1] = Counter()
+    udata[][2] = channel
+    udata[][3] = write_channel
+    
     var counter = udata[][1]
-    counter.total = proxies.len
 
-    ezspawn(v_threads, proxay_worker, udata)
-    ezsync()
+     
+    {.cast(gcsafe).}:  
+      var proxies = waitFor process_pages_sequential(v_max)
+      log "TOTAL PROXIES FOUND:", proxies.len
+      for p in proxies:
+        channel[].send p
+      # if v_max == 0:
+      #   for p in proxies:
+      #     channel.send p
+      # else:
+      #   for _ in 0..v_max:
+      #     channel.send proxies.pop
+      counter.total = proxies.len
+      
+    # for proxy in v_file.read_proxy_file: proxay_send proxy
 
-    # waitFor run_workers(v_threads, udata)
 
-    log counter.succ
-    log counter.total
+    var fdata = newShared[EZWriteData]()
+    fdata[][0] = v_fout
+    fdata[][1] = write_channel
+    var tg1 = ezspawn(ez_write_thread, fdata)
+    
+    if v_threads == 0:
+      # 1 * v_workers
+      waitFor run_workers(v_workers, udata[])
+    else:    
+      # v_threads * v_workers
+      var tg2 = ezspawn(proxay_thread, udata, v_threads)
+      tg2.ezsync()
+    
+    log "done checking proxies..."
+    write_channel[].close()
+    channel[].close()
 
-    # ts.joinThreads()
+    ezsync(tg1)
 
+    # if not b:
+    #   var f = open("working_proxies.txt", fmWrite)
+    #   ezloop_noclose write_channel, true:
+    #     f.writeLine(message)
+    #   f.close()
 
+    log "success", counter.succ
+    log "total success", counter.http + counter.https + counter.socks4 + counter.socks5
+    log "total", counter.total
+    log "done", counter.done
+    log "requests", counter.done * args.get("protocols", g_protocols).len
 
-
+    deallocShared(udata)
+    deallocShared(fdata)

@@ -2,7 +2,7 @@
 import ark, lag, url
 import libcurl
 import os, times, strformat, termstyle, math, strutils
-import httpclient
+import httpclient, base
 import asyncdispatch
 import threadpool
 type
@@ -206,7 +206,7 @@ proc curl_easy_request: CurlRequest  =
   opt cr, OPT_WRITEHEADER, cr.headerData
   opt cr, OPT_WRITEFUNCTION, curl_write_gen
   opt cr, OPT_HEADERFUNCTION, curl_write_gen
-  opt cr, OPT_USERAGENT, "Aberrant (curl)"
+  opt cr, OPT_USERAGENT, base.version & " (curl)"
   opt cr, OPT_ACCEPT_ENCODING, ""
   if v_curl_verbose:
     opt cr, OPT_VERBOSE, 1
@@ -416,10 +416,19 @@ proc curl_download*(dl: Download) =
 
 import httpclient, asyncdispatch
 
+proc init_client(c: AsyncHttpClient) =
+  c.headers["user-agent"] = base.version & " (asynchttpclient)"
+
 proc std_download_chunked*(dl: Download) =
   var client = newAsyncHttpClient()
-  
 
+proc std_proxy_check*(url: string, proxy: string): Future[bool] {.async.} =
+  var client = newAsyncHttpClient(proxy = proxy.newProxy)
+  client.init_client
+  client.timeout = 5
+  let res = await client.get(url)
+  if res.code == Http200: return true
+  return false
 
 # ------------------------------------------------------
 # public download/request api
