@@ -4,7 +4,7 @@ import libcurl
 import os, times, strformat, termstyle, math, strutils
 import httpclient, base
 import asyncdispatch
-import threadpool
+import ezthread, util, cpuinfo
 type
   Header* = object
     key*, value*: string
@@ -54,13 +54,7 @@ ra "chunk-size", "", help = "if chunked, chunk size"
 arg v_chunk_count, "chunk-count", 0, help = "if chunked, chunk count, overwrites chunk-size"
 arg v_sequential, "seq", false, help = "no threaded downloading"
 arg v_overwrite, "overwrite", false, help = "overwrite existing files"
-var
-  download_channel: Channel[Download]
-  dls: seq[Download]
-  p_dls = dls.addr
-  httpCclient = newHttpClient()
 
-download_channel.open()
 const CRLF = "\r\n"
 
 func `[]`*(headers: seq[Header], key: string): string =
@@ -295,10 +289,6 @@ proc fetch*(url: string, verb = "get", headers = newSeq[Header]()): string =
 proc isOk*(res: Response): bool =
   return res.error.len == 0 and 200 < res.code and res.code > 299
 
-# -------------------------------
-# download with curl
-# -------------------------------
-
 proc curl_download_chunked*(dl: Download) =
   let req = Request()
   req.url = dl.url.parseUrl
@@ -430,6 +420,10 @@ proc std_proxy_check*(url: string, proxy: string): Future[bool] {.async.} =
   if res.code == Http200: return true
   return false
 
+proc std_download(dl: Download) {.async.} =
+  var client = newAsyncHttpClient()
+  # client.headers = dl.headers.newHttpHeaders
+
 # ------------------------------------------------------
 # public download/request api
 # ------------------------------------------------------
@@ -494,15 +488,15 @@ proc download*(dl: Download) =
 proc download*(url, path: string, overwrite = false, show_progress = false) =
  download make_download(url, path, overwrite, show_progress)
 
-proc download_worker {.thread.} =
+proc download_thread(p: pointer) {.thread.} =
   lag_add_thread()
+  var chan = cast[ptr Channel[Download]](p)
   while true:
-    var tried = download_channel.tryRecv()
+    let tried = chan[].tryRecv()
     if not tried.dataAvailable: 
       lag_del_thread()
       break
-    let dl = tried.msg
-    dl.download()
+    tried.msg.download()
 
 proc download*(urls: openArray[string], path: string, headers: seq[Header] = @[]) =
   if urls.len <= 0:
@@ -511,16 +505,16 @@ proc download*(urls: openArray[string], path: string, headers: seq[Header] = @[]
   path.createDir
 
   if not v_sequential:
-
+    var channel = Download.ezchan()
     for url in urls:
       let p = url.parseUrl
       let dl = make_download(url, path / p.path.extractFilename)
       dl.headers = headers
-      download_channel.send dl
+      channel[].send dl
 
-    for i in 0..10:
-      spawn download_worker()
-    sync()
+    ezspawn(download_thread, channel, countProcessors()).ezsync()
+
+    channel.close()
   else:
     for url in urls:
       let p = url.parseUrl

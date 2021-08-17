@@ -179,3 +179,11 @@ proc ez_write_thread*(p: pointer) {.thread.} =
     let msg = channel[].recv()
     file.writeLine(msg)
   file.close()
+
+proc ezchan*[T](chanType: typedesc[T]): ptr Channel[T] =
+  result = newShared[Channel[T]]()
+  result[].open()
+
+proc close*[T](chanP: ptr Channel[T]) =
+  chanP[].close()
+  deallocShared(chanP)

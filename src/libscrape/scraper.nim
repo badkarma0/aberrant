@@ -39,12 +39,10 @@ proc `$`*(node: XmlNode, q: string): XmlNode = node.querySelector(q)
 proc `$$`*(node: XmlNode, q: string): seq[XmlNode] = node.querySelectorAll(q)
 
 proc fetch_html*(url: Url): XmlNode =
+  dbg url
   let res = fetch($url)
   let node = parseHtml(res)
-  if $node == "<document />":
-    return nil
-  else:
-    return node
+  return node
 
 proc fetch_json*(url: Url, s: Session = new Session): JsonNode =
   let res = fetch($url)
@@ -108,7 +106,7 @@ template scraper*(id: string, body: untyped) =
       return get_dl_root() / id / spath
     template pages(r1, r2: int, pages_body: untyped) =
       for i {.inject.} in r1..r2:
-        log &"{s_crawling} page " & $i
+        log &"{s_crawling} page", i, "/", r2
         block:
           pages_body
     template page(spath: string, page_body: untyped) =

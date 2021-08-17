@@ -248,23 +248,15 @@ scraper "proxay":
     udata[][3] = write_channel
     
     var counter = udata[][1]
-
      
     {.cast(gcsafe).}:  
       var proxies = waitFor process_pages_sequential(v_max)
       log "TOTAL PROXIES FOUND:", proxies.len
       for p in proxies:
         channel[].send p
-      # if v_max == 0:
-      #   for p in proxies:
-      #     channel.send p
-      # else:
-      #   for _ in 0..v_max:
-      #     channel.send proxies.pop
       counter.total = proxies.len
       
     # for proxy in v_file.read_proxy_file: proxay_send proxy
-
 
     var fdata = newShared[EZWriteData]()
     fdata[][0] = v_fout
@@ -283,14 +275,8 @@ scraper "proxay":
     write_channel[].close()
     channel[].close()
 
-    ezsync(tg1)
-
-    # if not b:
-    #   var f = open("working_proxies.txt", fmWrite)
-    #   ezloop_noclose write_channel, true:
-    #     f.writeLine(message)
-    #   f.close()
-
+    tg1.ezsync()
+    
     log "success", counter.succ
     log "total success", counter.http + counter.https + counter.socks4 + counter.socks5
     log "total", counter.total
