@@ -3,123 +3,39 @@
 
 let
   g_sources = [
-    "https://premproxy.com/socks-list/ip-port/3.htm",
-    "https://proxyscrape.com/proxies/SocksProxies.txt",
-    "https://premproxy.com/socks-list/ip-port/9.htm",
-    "https://premproxy.com/socks-list/ip-port/8.htm",
-    "https://premproxy.com/socks-list/ip-port/1.htm",
-    "https://premproxy.com/socks-list/ip-port/6.htm",
-    "https://premproxy.com/socks-list/ip-port/5.htm",
-    "http://proxy-daily.com/proxy/getproxymanual.php?limit=50000&filter=socks5",
-    "http://proxy-daily.com/proxy/getproxymanual.php?limit=50000&filter=socks4",
-    "https://premproxy.com/socks-list/ip-port/4.htm",
+    "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=socks4&timeout=10000&country=all",
+    "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=socks5&timeout=10000&country=all",
+    "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all",
+    "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=https&timeout=10000&country=all",
+    "https://proxy-daily.com/",
     "http://proxysearcher.sourceforge.net/Proxy%20List.php?type=socks",
-    "https://premproxy.com/socks-list/ip-port/2.htm",
-    "https://premproxy.com/socks-list/ip-port/10.htm",
-    "https://premproxy.com/socks-list/ip-port/7.htm",
-    "https://www.proxydocker.com/en/proxylist/search?port=All&type=All&anonymity=All&country=All&city=All&state=All&need=Google",
-    "https://proxydb.net/?offset=150",
-    "https://proxydb.net/?offset=105",
-    "http://nntime.com/proxy-updated-06.htm",
-    "https://www.proxydocker.com/en/proxylist/type/HTTPS",
-    "https://freevpn.ninja/free-proxy/txt",
-    "http://proxytime.ru/http",
-    "http://nntime.com/proxy-updated-07.htm",
-    "http://premiumproxy.net",
-    "https://premproxy.com/list/",
-    "https://www.proxydocker.com/en/proxylist/port/80",
-    "https://proxydb.net/?offset=60https://www.proxydocker.com/en/proxylist/port/8081",
+    "http://proxysearcher.sourceforge.net/Proxy%20List.php?type=http",
     "http://free-proxy-list.net/anonymous-proxy.html",
-    "http://nntime.com/proxy-updated-10.htm",
+    "https://free-proxy-list.net/",
+    "https://www.socks-proxy.net/",
     "http://sslproxies24.blogspot.in/feeds/posts/default",
-    "https://proxydb.net/?offset=120",
-    "https://www.proxydocker.com/en/proxylist/port/9000",
-    "http://vipaccounts24.blogspot.com/",
+    "http://vipaccounts24.blogspot.com/feeds/posts/default",
     "http://rootjazz.com/proxies/proxies.txt",
-    "https://www.spoofs.de/feeds/posts/default",
-    "http://www.vipsocks24.net/feeds/posts/default",
-    "https://www.proxydocker.com/en/proxylist/port/8088",
-    "https://proxydb.net/?offset=15",
-    "https://www.proxydocker.com/en/proxylist/port/8118",
     "http://proxyape.com/",
-    "https://www.proxydocker.com/en/proxylist/search?port=All&type=All&anonymity=All&country=All&city=All&state=All&need=Social",
-    "http://nntime.com/proxy-updated-03.htm",
-    "https://proxydb.net/?offset=75",
-    "https://www.my-proxy.com/free-proxy-list-3.html",
-    "https://www.my-proxy.com/free-transparent-proxy.html",
     "http://highbroadcast-proxy.blogspot.com/feeds/posts/default",
     "http://socksproxylist24.blogspot.com/feeds/posts/default",
-    "https://www.proxydocker.com/en/proxylist/port/53281",
-    "https://proxydb.net/?offset=90",
-    "https://www.my-proxy.com/free-proxy-list-6.html",
-    "http://premiumproxy.net/anonymous-proxy-list.php",
-    "https://guncelproxy.com/",
     "http://proxyandproxytools.blogspot.com/feeds/posts/default",
-    "https://55utd55.com/",
-    "https://www.proxydocker.com/en/proxylist/port/8123",
-    "http://proxylistchecker.org/proxylists.php?t=elite",
     "http://free-fresh-proxy-daily.blogspot.com/feeds/posts/default",
-    "https://www.proxydocker.com/en/proxylist/port/3128",
-    "http://nntime.com/proxy-updated-05.htm",
-    "http://nntime.com/proxy-updated-09.htm",
-    "http://nntime.com/proxy-updated-01.htm",
-    "https://premproxy.com/socks-list/{01-20}.htm",
-    "https://www.proxydocker.com/en/proxylist/port/10000",
-    "https://www.proxydocker.com/en/proxylist/port/8085",
-    "http://freshssh-list2018.blogspot.com/feeds/posts/default",
-    "https://worldproxy.info/",
-    "http://nntime.com/proxy-updated-04.htm",
-    "https://www.proxydocker.com/en/proxylist/search?port=All&type=All&anonymity=All&country=All&city=All&state=All&need=SEO",
     "http://www.live-socks.net/feeds/posts/default",
-    "https://www.proxydocker.com/en/proxylist/port/8080",
-    "https://proxy50-50.blogspot.com/",
-    "http://nntime.com/proxy-updated-08.htm",
-    "https://proxydb.net/?offset=135",
     "http://www.socks24.org/feeds/posts/default",
     "http://www.megaproxylist.net/",
-    "http://feeds.feedburner.com/proxypandora",
-    "http://newfreshproxies24.blogspot.com/feeds/posts/default",
-    "https://www.proxydocker.com/en/proxylist/search?port=All&type=All&anonymity=All&country=All&city=All&state=All&need=BOT",
     "http://getfreeproxylists.blogspot.com/",
-    "https://www.my-proxy.com/free-elite-proxy.html",
     "https://www.sslproxies.org/",
-    "http://premiumproxy.net/http-proxy-list.php",
-    "https://www.my-proxy.com/free-proxy-list-10.html",
-    "https://www.proxydocker.com/en/proxylist/port/8888",
-    "https://proxydb.net/?offset=30",
-    "http://txt.proxyspy.net/proxy.txt",
-    "http://spys.ru/free-proxy-list/RU/",
-    "https://www.my-proxy.com/free-proxy-list-5.html",
     "http://proxiatyomia.blogspot.com/feeds/posts/default",
-    "https://www.proxydocker.com/en/proxylist/port/65000",
-    "https://topproxy.info/",
-    "https://www.proxydocker.com/en/proxylist/port/1080",
-    "https://www.my-proxy.com/free-proxy-list-7.html",
-    "https://www.my-proxy.com/free-anonymous-proxy.html",
-    "https://www.my-proxy.com/free-proxy-list-4.html",
-    "http://blog.proxies24.com/",
-    "https://www.proxydocker.com/en/proxylist/port/14",
-    "http://fineproxy.org/eng/fresh-proxies/",
     "http://www.proxyserverlist24.top/feeds/posts/default",
-    "http://nntime.com/proxy-updated-02.htm",
-    "http://premiumproxy.net/https-ssl-proxy-list.php",
-    "https://www.socks-proxy.net/",
-    "https://www.my-proxy.com/free-proxy-list-2.html",
-    "https://proxydb.net/?offset=45",
-    "https://www.my-proxy.com/free-proxy-list.html",
-    "https://www.my-proxy.com/free-proxy-list-8.html",
-    "https://www.my-proxy.com/free-proxy-list-9.html",
-    "https://www.proxydocker.com/en/proxylist/type/HTTP",
-    "https://proxyfreaks.com/",
-    "https://www.proxydocker.com/en/proxylist/port/808"
   ]
 
 import ../libscrape
-import sets, re, threadpool, ../libscrape/libcurl, asyncdispatch, httpclient
+import sets, re, asyncdispatch, httpclient, sequtils
 
 type 
   Counter = ref object
-    fail,succ,done,total,http,https,socks4,socks5: int
+    fail,succ,done,total,http,https,socks4,socks5,working: int
   Udata = (ArgStore, Counter, ptr Channel[string], ptr Channel[string])
 const 
   azenv = "http://azenv.net"
@@ -127,11 +43,7 @@ const
 
 let
   r_ip_port = re"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}"
-
-iterator read_proxy_file(file: string): string =
-  for line in file.lines:
-    if line.strip.len != 0:
-      yield line
+  r_xml_tag = re"<[^>]*>"
 
 proc process_page(url: string): Future[HashSet[string]] {.async.} =
   var client = newAsyncHttpClient()
@@ -141,6 +53,7 @@ proc process_page(url: string): Future[HashSet[string]] {.async.} =
     data = await client.getContent(url)
   except Exception:
     discard
+  # data = data.replace(r_xml_tag, "")
   for m in data.findAll(r_ip_port):
     result.incl m
   log "found", result.len, "proxies"
@@ -152,9 +65,9 @@ proc process_pages(): Future[HashSet[string]] {.async.} =
   for f in ts:
     result.incl await f
 
-proc process_pages_sequential(max: int): Future[HashSet[string]] {.async.} =
-  var ts: seq[Future[HashSet[string]]]
-  for source in g_sources:
+proc process_pages_sequential(max: int, sources: seq[string]
+): Future[HashSet[string]] {.async.} =
+  for source in sources:
     let proxies = await process_page(source)
     result.incl proxies
     if max != 0 and result.len > max:
@@ -169,7 +82,9 @@ proc proxay_worker(udata: Udata) {.async.} =
     args = udata[0]
     counter = udata[1]
     write_channel = udata[3]
-    protocols = args.get("protocols", g_protocols)
+    # protocols = args.get("protocols", g_protocols)
+    protocols = g_protocols
+    working = args.get("working", 0)
     f = true
   while true:
     let pek = channel[].peek()
@@ -181,11 +96,13 @@ proc proxay_worker(udata: Udata) {.async.} =
       var ok = false
       logv prox
       try:
-        ok = await withTimeout(std_proxy_check(azenv, prox), 5000)
+        ok = await std_proxy_check(azenv, prox)
       except Exception:
         ok = false
       if ok:
         log "OK", prox
+        inc counter.working
+        if working != 0 and counter.working >= working: return
         write_channel[].send(prox)
         if prot == "http":
           inc counter.http
@@ -222,18 +139,22 @@ proc proxay_thread(p: pointer) {.thread.} =
   waitFor run_workers(v_workers, udata)
 
 scraper "proxay":
-  ra "arg1", req = true, help = "a file"
+  ra "arg1", help = "a file with proxies to check"
   ra "threads", def = 0, help = "number of threads"
   ra "workers", def = 100, help = "number of workers per thread"
-  ra "protocols", def = g_protocols, help = "protocols to check"
+  # ra "protocols", def = g_protocols, help = "protocols to check"
   ra "max", def = 1000, help = "max proxies to check"
+  ra "working", def = 1000, help = "will stop checking when working amount is found"
   ra "fout", def = "working.txt", help = "file to output working proxies to"
+  ra "sources", def = false, help = "treats arg1 as a file with sources instead"
   exec:
     gag v_file, "arg1"
+    gag v_sources, "sources", false
     gag v_threads, "threads", 0
     gag v_max, "max", 1000
     gag v_workers, "workers", 100
     gag v_fout, "fout", "working.txt"
+    # let v_fout = args.get("fout", "working.txt")
 
     var
       channel = newShared[Channel[string]]()
@@ -249,8 +170,20 @@ scraper "proxay":
     
     var counter = udata[][1]
      
-    {.cast(gcsafe).}:  
-      var proxies = waitFor process_pages_sequential(v_max)
+    {.cast(gcsafe).}:
+      var proxies: HashSet[string]
+      dbg v_file
+      if v_file != "":
+        var lines: seq[string]
+        for line in v_file.lines:
+          lines.add line
+        if v_sources:
+          proxies = waitFor process_pages_sequential(v_max, lines)
+        else:
+          proxies = lines.toHashSet
+      else:
+        proxies = waitFor process_pages_sequential(v_max, g_sources.toSeq)
+
       log "TOTAL PROXIES FOUND:", proxies.len
       for p in proxies:
         channel[].send p
@@ -276,12 +209,12 @@ scraper "proxay":
     channel[].close()
 
     tg1.ezsync()
-    
+
     log "success", counter.succ
-    log "total success", counter.http + counter.https + counter.socks4 + counter.socks5
+    log "working", counter.working
     log "total", counter.total
     log "done", counter.done
-    log "requests", counter.done * args.get("protocols", g_protocols).len
+    # log "requests", counter.done * args.get("protocols", g_protocols).len
 
     deallocShared(udata)
     deallocShared(fdata)

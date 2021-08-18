@@ -286,7 +286,7 @@ func `/`*(x: Url, path: string): Url =
     assert bar.path == "/foo/bar/baz"
     let qux = parseUri("https://nim-lang.org/foo/bar/") / "baz"
     assert qux.path == "/foo/bar/baz"
-  result = parseUrl $x
+  result = x.deepCopy
 
   if result.path.len == 0:
     if path.len == 0 or path[0] != '/':

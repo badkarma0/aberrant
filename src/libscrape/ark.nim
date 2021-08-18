@@ -97,6 +97,10 @@ template loa(ags: ArgStore, name: string, def: typed, body: untyped) =
       echo getCurrentExceptionMsg()
     return def
 
+
+proc ga*[T](name: string, def: T = ""): T =
+  loa gArgStore, name, def:
+    return ar.parseJson.to T
 proc ga*(name: string, def = ""): string =
   loa gArgStore, name, def:
     return ar
@@ -109,18 +113,24 @@ proc ga*(name: string, def: int): int =
 proc ga*(name: string, def: float): float =
   loa gArgStore, name, def:
     return ar.parseFloat
-proc ga*[T](name: string, def: T = ""): T =
-  loa gArgStore, name, def:
-    return ar.parseJson.to T
 
-proc get*(ags: ArgStore, name: string): string =
-  loa ags, name, "":
-    return ar
-
-proc get*[T](ags: ArgStore, name: string, def: T): T =
+# proc get*[T](ags: ArgStore, name: string, def: T): T =
+#   loa ags, name, def:
+#     return ags[name].parseJson.to T
+proc get*(ags: ArgStore, name: string, def = ""): string =
   loa ags, name, def:
-    return ags[name].parseJson.to T
-
+    return ar
+proc get*(ags: ArgStore, name: string, def: bool): bool =
+  loa ags, name, def:
+    return ar.parseBool
+proc get*(ags: ArgStore, name: string, def: int): int =
+  loa ags, name, def:
+    return ar.parseInt
+proc get*(ags: ArgStore, name: string, def: float): float =
+  loa ags, name, def:
+    return ar.parseFloat
+  
+  
 proc add_arg(name, kind, help, smod: string, req: bool, def: string) =
   r_args.add Arg(name: name, help: help, kind: kind, req: req, smod: smod, def: def)
 

@@ -412,11 +412,12 @@ proc init_client(c: AsyncHttpClient) =
 proc std_download_chunked*(dl: Download) =
   var client = newAsyncHttpClient()
 
-proc std_proxy_check*(url: string, proxy: string): Future[bool] {.async.} =
+proc std_proxy_check*(url: string, proxy: string, timeout = 5000): Future[bool] {.async.} =
   var client = newAsyncHttpClient(proxy = proxy.newProxy)
   client.init_client
-  client.timeout = 5
-  let res = await client.get(url)
+  let f = client.get(url)
+  if not await withTimeout(f, timeout): return false
+  let res = await f
   if res.code == Http200: return true
   return false
 

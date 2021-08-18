@@ -41,7 +41,7 @@ proc main =
   ra "trace", false, help = "show trace with debug logging"
   arg v_help, "help", false, help = "show this menu"
   arg v_version, "version", false, help = "print version"
-  arg v_arg0, "arg0", help = &"scraper name or url\n scraper can be one of {scrapers}", req = true
+  arg v_arg0, "arg0", help = &"scraper name or url", req = true
   arg v_tui, "tui", false, help = &"use terminal user interface"
   arg v_file, "file", help = "read links from file"
   arg v_dl, "dl", help = "download a file"
@@ -59,7 +59,7 @@ proc main =
     else:
       echo base.version & " (debug)"
     echo "Compiled with Nim v" & NimVersion
-    echo "Compiled at " & CompileDate & "/" & CompileTime
+    echo "Compiled at " & CompileDate & " " & CompileTime
     echo libcurl.version()
     return
   
