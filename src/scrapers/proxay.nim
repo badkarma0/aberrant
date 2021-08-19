@@ -143,15 +143,15 @@ scraper "proxay":
   ra "threads", def = 0, help = "number of threads"
   ra "workers", def = 100, help = "number of workers per thread"
   # ra "protocols", def = g_protocols, help = "protocols to check"
-  ra "max", def = 1000, help = "max proxies to check"
-  ra "working", def = 1000, help = "will stop checking when working amount is found"
+  ra "max", def = 1000000, help = "max proxies to check"
+  ra "working", def = 1000000, help = "will stop checking when working amount is found"
   ra "fout", def = "working.txt", help = "file to output working proxies to"
   ra "sources", def = false, help = "treats arg1 as a file with sources instead"
   exec:
     gag v_file, "arg1"
     gag v_sources, "sources", false
     gag v_threads, "threads", 0
-    gag v_max, "max", 1000
+    gag v_max, "max", 1000000
     gag v_workers, "workers", 100
     gag v_fout, "fout", "working.txt"
     # let v_fout = args.get("fout", "working.txt")
